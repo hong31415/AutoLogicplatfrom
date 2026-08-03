@@ -1,0 +1,68 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+credentials*.json
+secrets*.json
+
+# Python / JavaScript environments and caches
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime processes, logs, databases, and user output
+.run/
+*.log
+*.pid
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+backend/data/
+
+# Personal DFA/query caches and retrieved market material
+backend/logicrag_runtime/user_dfa/
+backend/logicrag_runtime/*/query_*
+backend/logicrag_runtime/*/ifind_materials/
+backend/logicrag_runtime/*/document_a_state_sequence.json
+backend/logicrag_runtime/*/document_b_state_sequence.json
+backend/logicrag_runtime/*/global_template.legacy.json
+backend/logicrag_runtime/*/global_template.source_degenerate.json
+backend/logicrag_runtime/*/state_index.source_degenerate.json
+
+# Raw/private corpora
+data/
+FinLDP-Bench-*/
+
+# Third-party proprietary SDK binaries. See vendor/README.md.
+vendor/*
+!vendor/README.md
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.tmp
+
+# Packages and exports
+*.zip
+*.7z
+*.tar
+*.gz

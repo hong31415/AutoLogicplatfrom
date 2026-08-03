@@ -1,0 +1,206 @@
+{
+  "document_count": 20000,
+  "case_file_count": 10000,
+  "sequence_pattern_count": 24,
+  "top_sequences": [
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 资金流情况",
+        "ETF 融资融券情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 11505,
+      "frequency": 0.57525
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 产品概况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 4059,
+      "frequency": 0.20295
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 资金流情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 648,
+      "frequency": 0.0324
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 融资融券情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 632,
+      "frequency": 0.0316
+    },
+    {
+      "states": [
+        "ETF 资金流情况",
+        "ETF 融资融券情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 508,
+      "frequency": 0.0254
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 资金流情况",
+        "ETF 融资融券情况"
+      ],
+      "documents": 492,
+      "frequency": 0.0246
+    },
+    {
+      "states": [
+        "ETF 产品概况",
+        "ETF 资金流情况",
+        "ETF 融资融券情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 270,
+      "frequency": 0.0135
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 产品概况",
+        "ETF 资金流情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 263,
+      "frequency": 0.01315
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 产品概况",
+        "ETF 融资融券情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 222,
+      "frequency": 0.0111
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 产品概况",
+        "ETF 资金流情况",
+        "ETF 融资融券情况"
+      ],
+      "documents": 201,
+      "frequency": 0.01005
+    },
+    {
+      "states": [
+        "ETF 产品概况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 196,
+      "frequency": 0.0098
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 185,
+      "frequency": 0.00925
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 产品概况"
+      ],
+      "documents": 176,
+      "frequency": 0.0088
+    },
+    {
+      "states": [
+        "ETF 产品概况",
+        "ETF 资金流情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 148,
+      "frequency": 0.0074
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 产品概况",
+        "ETF 资金流情况"
+      ],
+      "documents": 137,
+      "frequency": 0.00685
+    },
+    {
+      "states": [
+        "二级市场概况",
+        "ETF 产品概况",
+        "ETF 融资融券情况"
+      ],
+      "documents": 130,
+      "frequency": 0.0065
+    },
+    {
+      "states": [
+        "ETF 产品概况",
+        "ETF 融资融券情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 110,
+      "frequency": 0.0055
+    },
+    {
+      "states": [
+        "ETF 产品概况",
+        "ETF 资金流情况",
+        "ETF 融资融券情况"
+      ],
+      "documents": 41,
+      "frequency": 0.00205
+    },
+    {
+      "states": [
+        "ETF 融资融券情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 19,
+      "frequency": 0.00095
+    },
+    {
+      "states": [
+        "ETF 资金流情况",
+        "ETF 新发及上市情况"
+      ],
+      "documents": 14,
+      "frequency": 0.0007
+    }
+  ],
+  "state_frequencies": {
+    "二级市场概况": 0.93345,
+    "ETF 产品概况": 0.2989,
+    "ETF 资金流情况": 0.71255,
+    "ETF 融资融券情况": 0.7075,
+    "ETF 新发及上市情况": 0.93895
+  },
+  "transition_frequencies": {
+    "二级市场概况->ETF 产品概况": 0.2594,
+    "ETF 融资融券情况->ETF 新发及上市情况": 0.6633,
+    "ETF 产品概况->ETF 资金流情况": 0.05365,
+    "ETF 资金流情况->ETF 新发及上市情况": 0.05365,
+    "二级市场概况->ETF 资金流情况": 0.6328,
+    "ETF 资金流情况->ETF 融资融券情况": 0.65085,
+    "ETF 产品概况->ETF 新发及上市情况": 0.21275,
+    "二级市场概况->ETF 融资融券情况": 0.032,
+    "S0->二级市场概况": 0.93345,
+    "S0->ETF 产品概况": 0.0395
+  }
+}

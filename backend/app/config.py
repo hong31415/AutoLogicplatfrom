@@ -68,7 +68,9 @@ class Settings:
     market_data_source: str = os.environ.get("SUBDFA_MARKET_DATA_SOURCE", "auto").strip().lower()
     market_data_cache_seconds: int = int(os.environ.get("SUBDFA_MARKET_DATA_CACHE_SECONDS", "300"))
     market_data_lookback_days: int = int(os.environ.get("SUBDFA_MARKET_DATA_LOOKBACK_DAYS", "45"))
-    database_enabled: bool = os.environ.get("SUBDFA_DATABASE_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+    # The public checkout must start without a local MySQL installation. Private
+    # deployments opt in through backend/.env or an environment variable.
+    database_enabled: bool = os.environ.get("SUBDFA_DATABASE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
     database_driver: str = os.environ.get("SUBDFA_DATABASE_DRIVER", "mysql").strip().lower()
     database_host: str = os.environ.get("SUBDFA_DATABASE_HOST", "127.0.0.1").strip()
     database_port: int = int(os.environ.get("SUBDFA_DATABASE_PORT", "3306"))

@@ -11,6 +11,13 @@ from app.database import get_run, init_schema, save_run
 from app.services.deepseek import generate_sections, refine_sections
 from app.services.market_data import provider_health
 from app.services.pipeline import build_analysis, build_steps, enrich_analysis_internal_dfa
+from app.services.template_dfa_builder import (
+    archive_template_dfa_record,
+    create_template_dfa_job,
+    get_template_dfa_job,
+    template_dfa_detail,
+    template_dfa_library,
+)
 
 
 def response(handler: BaseHTTPRequestHandler, status: int, payload: dict[str, Any]) -> None:
@@ -88,12 +95,44 @@ class ApiHandler(BaseHTTPRequestHandler):
                 run["analysis"] = enrich_analysis_internal_dfa(run["analysis"])
             response(self, 200, run)
             return
+        if path == f"{settings.api_prefix}/template-dfas":
+            response(self, 200, {"items": template_dfa_library()})
+            return
+        job_prefix = f"{settings.api_prefix}/template-dfa-jobs/"
+        if path.startswith(job_prefix):
+            job_id = path.removeprefix(job_prefix).strip("/")
+            job = get_template_dfa_job(job_id)
+            if not job:
+                response(self, 404, {"error": "Template DFA build job not found"})
+                return
+            response(self, 200, job)
+            return
+        template_prefix = f"{settings.api_prefix}/template-dfas/"
+        if path.startswith(template_prefix):
+            dfa_id = path.removeprefix(template_prefix).strip("/")
+            item = template_dfa_detail(dfa_id)
+            if not item:
+                response(self, 404, {"error": "Uploaded template DFA not found"})
+                return
+            response(self, 200, item)
+            return
         response(self, 404, {"error": "Not found"})
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         try:
             payload = read_json(self)
+            if path == f"{settings.api_prefix}/template-dfa-jobs":
+                response(self, 202, create_template_dfa_job(payload))
+                return
+            if path == f"{settings.api_prefix}/template-dfas/archive":
+                dfa_id = str(payload.get("id") or "").strip()
+                if not dfa_id:
+                    response(self, 400, {"error": "Template DFA id is required"})
+                    return
+                archived = archive_template_dfa_record(dfa_id)
+                response(self, 200 if archived else 404, {"archived": archived, "id": dfa_id})
+                return
             query = str(payload.get("query", "")).strip()
             tau = float(payload.get("tau", 0.42))
             if not query:

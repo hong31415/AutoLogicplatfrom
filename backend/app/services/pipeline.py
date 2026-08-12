@@ -268,17 +268,17 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
     raw_nodes = custom_dfa.get("nodes", [])
     raw_edges = custom_dfa.get("edges", [])
     if not isinstance(raw_nodes, list) or not 2 <= len(raw_nodes) <= 80:
-        raise ValueError("用户 DFA 必须包含 2 至 80 个状态。")
+        raise ValueError("用户写作图必须包含 2 至 80 个状态。")
     if not isinstance(raw_edges, list) or len(raw_edges) > 500:
-        raise ValueError("用户 DFA 的状态转移不能超过 500 条。")
+        raise ValueError("用户写作图的状态转移不能超过 500 条。")
 
     node_ids: list[str] = []
     for raw_node in raw_nodes:
         if not isinstance(raw_node, dict):
-            raise ValueError("用户 DFA 节点格式无效。")
+            raise ValueError("用户写作图节点格式无效。")
         node_id = _custom_dfa_text(raw_node.get("id"), 64)
         if not node_id or node_id in node_ids:
-            raise ValueError("用户 DFA 节点 ID 不能为空且不能重复。")
+            raise ValueError("用户写作图节点 ID 不能为空且不能重复。")
         node_ids.append(node_id)
 
     root_candidates = [
@@ -286,7 +286,7 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
         if str(raw_node.get("type", "")).lower() == "root" or int(raw_node.get("level") or 0) == 0
     ]
     if not root_candidates:
-        raise ValueError("用户 DFA 缺少入口状态。")
+        raise ValueError("用户写作图缺少入口状态。")
     root_id = _custom_dfa_text(root_candidates[0].get("id"), 64)
     node_id_set = set(node_ids)
     nodes: list[dict[str, Any]] = []
@@ -378,18 +378,18 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
         transition_function.append({"source": source, "condition": symbol, "target": target})
 
     if not transitions:
-        raise ValueError("用户 DFA 至少需要一条有效状态转移。")
+        raise ValueError("用户写作图至少需要一条有效状态转移。")
     outgoing = {edge["source"] for edge in transitions}
     final_states = [node_id for node_id in node_ids if node_id not in outgoing and node_id != root_id]
     if not final_states:
         final_states = [node_ids[-1]]
-    name = _custom_dfa_text(custom_dfa.get("name") or "我的 DFA", 160)
+    name = _custom_dfa_text(custom_dfa.get("name") or "我的写作图", 160)
     return {
         "template_id": f"user_{domain_key}_{hashlib.sha256(name.encode('utf-8')).hexdigest()[:12]}",
         "language": "zh",
-        "template_description": f"{name} · 用户自定义写作 DFA",
+        "template_description": f"{name} · 用户自定义写作图",
         "structure_pattern": {
-            "reasoning_logic": "按用户自定义的段落状态、材料规则和状态转移动态构建 SubDFA。",
+            "reasoning_logic": "按用户自定义的段落状态、材料规则和状态转移动态构建查询执行图。",
             "node_types": ["root", "leaf"],
             "transitions": transitions,
         },
@@ -405,8 +405,8 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
             "deterministic": True,
         },
         "usage_instruction": {
-            "offline": "用户在“我的 DFA”中编辑并保存结构。",
-            "online": "对当前问题匹配用户状态，并按用户转移构建确定性 SubDFA。",
+            "offline": "用户在“我的写作图”中编辑并保存结构。",
+            "online": "对当前问题匹配用户状态，并按用户转移构建确定性执行顺序。",
         },
         "logicrag_metadata": {
             "schema_version": "autologic-user-dfa/v1",
@@ -441,7 +441,7 @@ def ensure_user_dfa_artifacts(
                 "artifact_mode": "user-custom",
                 "domain_key": domain_key,
                 "user_dfa_id": _custom_dfa_text(custom_dfa.get("id"), 160),
-                "user_dfa_name": _custom_dfa_text(custom_dfa.get("name") or "我的 DFA", 160),
+                "user_dfa_name": _custom_dfa_text(custom_dfa.get("name") or "我的写作图", 160),
                 "content_hash": digest,
                 "outputs": {"global_template": str(template_path), "state_index": str(index_path)},
             },
@@ -1575,7 +1575,7 @@ def materials_for(node_id: str, frontend_node: dict[str, Any], runtime: dict[str
         "retrieved_facts": [
             f"状态来源：{runtime['artifact_mode']} artifact / {runtime['domain']}",
             f"状态材料要求：{', '.join(materials) if materials else '无显式材料要求'}",
-            "当前阶段展示 DFA 与状态级绑定；接入 iFinD 后可替换为真实检索数据。",
+            "当前阶段展示写作图与状态级绑定；接入 iFinD 后可替换为真实检索数据。",
         ],
     }
 
@@ -1922,7 +1922,7 @@ def materials_for(
     elif runtime.get("evidence", {}).get("enabled"):
         facts.append(f"Evidence retrieval produced no binding for this state; status={runtime.get('evidence', {}).get('status')}.")
     else:
-        facts.append("DFA state-level material binding is active, but no external evidence source is enabled.")
+        facts.append("Writing-graph state-level material binding is active, but no external evidence source is enabled.")
     return {
         "node_id": node_id,
         "label": frontend_node["label"],
@@ -1955,7 +1955,7 @@ def draft_section(
         demo_evidence = any(binding.get("provider") == "demo" for binding in verified_bindings)
         if language == "en":
             content = (
-                f"As of {date}, verified evidence for {node['label']} includes: "
+                f"As of {date}, provider-bound evidence for {node['label']} includes: "
                 + "; ".join(facts)
                 + ". The signals should be interpreted within the stated data cutoff and evidence coverage."
             )
@@ -2006,7 +2006,7 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
     subdfa = analysis["subdfa"]
     edges = analysis["template"]["edges"]
     using_user_dfa = analysis.get("runtime", {}).get("dfa_source") == "user"
-    user_dfa_name = analysis.get("runtime", {}).get("user_dfa", {}).get("name", "我的 DFA") if using_user_dfa else ""
+    user_dfa_name = analysis.get("runtime", {}).get("user_dfa", {}).get("name", "我的写作图") if using_user_dfa else ""
     steps = [
         {
             "title": "接收 Query",
@@ -2016,11 +2016,11 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
             "detail": {"query": analysis["query"], "constraints": analysis["constraints"]},
         },
         {
-            "title": "读取我的 DFA" if using_user_dfa else "AutoLogic 离线诱导",
+            "title": "读取我的写作图" if using_user_dfa else "AutoLogic 离线诱导",
             "description": (
-                f"读取用户保存的“{user_dfa_name}”，使用其段落状态、材料要求与转移结构构建本次 SubDFA。"
+                f"读取用户保存的“{user_dfa_name}”，使用其段落状态、材料要求与转移结构构建本次查询执行图。"
                 if using_user_dfa
-                else "从同领域历史报告对齐语义状态、统计稳定转移并诱导归一化证据条件，生成或读取全局 DFA。"
+                else "从同领域历史报告对齐语义状态、统计稳定转移并诱导归一化证据条件，生成或读取全局写作图。"
             ),
             "active_nodes": [node["id"] for node in analysis["template"]["nodes"]],
             "active_edges": [edge["id"] for edge in edges],
@@ -2050,7 +2050,7 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
             "detail": {"tau": analysis["tau"], "fallback_top_k": analysis["runtime"]["fallback_top_k"], "matched_states": matched_states},
         },
         {
-            "title": "候选 SubDFA",
+            "title": "候选执行图",
             "description": "从初始状态到各命中状态寻找历史支持度最高的路径，并合并为候选子图。",
             "active_nodes": analysis["raw_subdfa"]["node_ids"],
             "active_edges": analysis["raw_subdfa"]["edge_ids"],
@@ -2061,8 +2061,8 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
             },
         },
         {
-            "title": "SubDFA Visualization",
-            "description": "根据当前对话和条件优先级，从候选子图中选择确定性的可执行 SubDFA 路径。",
+            "title": "Query-Specific Execution Graph",
+            "description": "根据当前对话和条件优先级，从候选子图中选择确定性的可执行路径。",
             "active_nodes": subdfa["node_ids"],
             "active_edges": subdfa["edge_ids"],
             "detail": {"visual_nodes": subdfa["node_ids"], "visual_edges": subdfa["edge_ids"]},
@@ -2082,7 +2082,7 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
         steps.append(
             {
                 "title": f"生成片段 {index + 1}: {section['label']}",
-                "description": "按照 subDFA 执行顺序逐状态生成，并只向下一状态传递摘要。",
+                "description": "按照查询执行图的确定性顺序逐状态生成，并只向下一状态传递摘要。",
                 "active_nodes": [section["node_id"]],
                 "active_edges": [edge] if edge else [],
                 "generated_until": index + 1,
@@ -2147,7 +2147,7 @@ def build_analysis(query: str, tau: float = 0.5, payload: dict[str, Any] | None 
         "dfa_source": "user" if isinstance(custom_dfa, dict) else "system",
         "user_dfa": {
             "id": _custom_dfa_text(custom_dfa.get("id"), 160),
-            "name": _custom_dfa_text(custom_dfa.get("name") or "我的 DFA", 160),
+            "name": _custom_dfa_text(custom_dfa.get("name") or "我的写作图", 160),
             "base_domain": _custom_dfa_text(custom_dfa.get("baseDomain") or domain_key, 80),
         } if isinstance(custom_dfa, dict) else None,
         "rebuilt": artifacts["rebuilt"],
@@ -2257,7 +2257,7 @@ def build_analysis(query: str, tau: float = 0.5, payload: dict[str, Any] | None 
         "logicrag_source": {
             "document_learner": runtime["document_learner"],
             "query_processing": runtime["query_processing"],
-            "algorithm": "historical state alignment -> frequency filtering -> condition induction -> candidate paths -> deterministic SubDFA execution",
+            "algorithm": "historical state alignment -> frequency filtering -> condition induction -> candidate paths -> deterministic execution order",
         },
         "constraints": {
             "date": date,

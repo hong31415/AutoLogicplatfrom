@@ -9,13 +9,14 @@
   "historical_case_file_count": 10000,
   "sequence_pattern_count": 6,
   "frequency_threshold": 0.03,
-  "embedding_backend": "local-hash",
-  "embedding_model": "local-char-ngram-hash",
+  "embedding_backend": "api",
+  "embedding_model": "text-embedding-v4",
   "rebuild_reason": "AutoLogic cache migration: cached DFA uses the sampled induction profile; cached DFA covers 500 case files, expected 10000",
   "outputs": {
     "global_template": "<local-path>",
     "state_index": "<local-path>",
     "induction_summary": "<local-path>",
     "manifest": "<local-path>"
-  }
+  },
+  "embedding_rebuilt_reason": "Cached state_index embedding backend is local-hash, expected api."
 }

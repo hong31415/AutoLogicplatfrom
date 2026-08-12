@@ -112,6 +112,21 @@ def init_schema() -> None:
                     FOREIGN KEY (run_id) REFERENCES report_runs(id) ON DELETE SET NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_material_records_run_node ON material_records(run_id, node_id);
+                CREATE TABLE IF NOT EXISTS template_dfas (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    domain_key TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    origin TEXT NOT NULL DEFAULT 'uploaded-template',
+                    graph_json TEXT NOT NULL,
+                    quality_json TEXT,
+                    files_json TEXT,
+                    storage_path TEXT,
+                    archived INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_template_dfas_domain_category ON template_dfas(domain_key, category, archived);
                 """
             )
         return
@@ -172,6 +187,26 @@ def init_schema() -> None:
                         FOREIGN KEY (run_id)
                         REFERENCES report_runs(id)
                         ON DELETE SET NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS template_dfas (
+                    id VARCHAR(128) NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    domain_key VARCHAR(128) NOT NULL,
+                    category VARCHAR(128) NOT NULL,
+                    origin VARCHAR(64) NOT NULL DEFAULT 'uploaded-template',
+                    graph_json JSON NOT NULL,
+                    quality_json JSON NULL,
+                    files_json JSON NULL,
+                    storage_path TEXT NULL,
+                    archived BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    PRIMARY KEY (id),
+                    INDEX idx_template_dfas_domain_category (domain_key, category, archived)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
                 """
             )
@@ -423,3 +458,171 @@ def save_run(
                     ),
                 )
     return run_id
+
+
+def _template_dfa_row(row: dict[str, Any]) -> dict[str, Any]:
+    graph = _json_value(row.get("graph_json"), {})
+    quality = _json_value(row.get("quality_json"), {})
+    files = _json_value(row.get("files_json"), [])
+    created_at = row.get("created_at")
+    updated_at = row.get("updated_at")
+    if isinstance(graph, dict):
+        graph["serverId"] = str(row.get("id") or graph.get("id") or "")
+        graph.setdefault("name", row.get("name", ""))
+        graph.setdefault("baseDomain", row.get("domain_key", ""))
+        graph.setdefault("category", row.get("category", ""))
+        graph.setdefault("origin", row.get("origin", "uploaded-template"))
+    return {
+        "id": str(row.get("id") or ""),
+        "name": row.get("name", ""),
+        "domain": row.get("domain_key", ""),
+        "category": row.get("category", ""),
+        "origin": row.get("origin", "uploaded-template"),
+        "graph": graph,
+        "quality": quality,
+        "files": files,
+        "storage_path": row.get("storage_path", ""),
+        "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at or ""),
+        "updated_at": updated_at.isoformat() if hasattr(updated_at, "isoformat") else str(updated_at or ""),
+    }
+
+
+def save_template_dfa(
+    *,
+    graph: dict[str, Any],
+    quality: dict[str, Any],
+    files: list[dict[str, Any]],
+    storage_path: str,
+) -> str | None:
+    """Persist a DFA induced from user-uploaded templates."""
+    if not is_configured():
+        return None
+    init_schema()
+    dfa_id = str(graph.get("id") or "")
+    if not dfa_id:
+        raise ValueError("Template DFA id is required.")
+    now = datetime.now()
+    graph_json = json.dumps(graph, ensure_ascii=False, default=str)
+    quality_json = json.dumps(quality, ensure_ascii=False, default=str)
+    files_json = json.dumps(files, ensure_ascii=False, default=str)
+    if settings.database_driver == "sqlite":
+        timestamp = now.isoformat(timespec="seconds")
+        with connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO template_dfas (
+                    id, name, domain_key, category, origin, graph_json, quality_json,
+                    files_json, storage_path, archived, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name, domain_key=excluded.domain_key, category=excluded.category,
+                    graph_json=excluded.graph_json, quality_json=excluded.quality_json,
+                    files_json=excluded.files_json, storage_path=excluded.storage_path,
+                    archived=0, updated_at=excluded.updated_at
+                """,
+                (
+                    dfa_id,
+                    str(graph.get("name") or "上传模板写作图"),
+                    str(graph.get("baseDomain") or "macro"),
+                    str(graph.get("category") or "未分类模板"),
+                    str(graph.get("origin") or "uploaded-template"),
+                    graph_json,
+                    quality_json,
+                    files_json,
+                    storage_path,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+        return dfa_id
+
+    with connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO template_dfas (
+                    id, name, domain_key, category, origin, graph_json, quality_json,
+                    files_json, storage_path, archived, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, CAST(%s AS JSON), CAST(%s AS JSON),
+                          CAST(%s AS JSON), %s, FALSE, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    name=VALUES(name), domain_key=VALUES(domain_key), category=VALUES(category),
+                    graph_json=VALUES(graph_json), quality_json=VALUES(quality_json),
+                    files_json=VALUES(files_json), storage_path=VALUES(storage_path),
+                    archived=FALSE, updated_at=VALUES(updated_at)
+                """,
+                (
+                    dfa_id,
+                    str(graph.get("name") or "上传模板写作图"),
+                    str(graph.get("baseDomain") or "macro"),
+                    str(graph.get("category") or "未分类模板"),
+                    str(graph.get("origin") or "uploaded-template"),
+                    graph_json,
+                    quality_json,
+                    files_json,
+                    storage_path,
+                    now,
+                    now,
+                ),
+            )
+    return dfa_id
+
+
+def list_template_dfas() -> list[dict[str, Any]]:
+    if not is_configured():
+        return []
+    init_schema()
+    query = """
+        SELECT id, name, domain_key, category, origin, graph_json, quality_json,
+               files_json, storage_path, created_at, updated_at
+        FROM template_dfas
+        WHERE archived = {archived}
+        ORDER BY domain_key, category, updated_at DESC
+    """
+    with connection() as conn:
+        if settings.database_driver == "sqlite":
+            rows = [dict(row) for row in conn.execute(query.format(archived="0")).fetchall()]
+        else:
+            with conn.cursor() as cur:
+                cur.execute(query.format(archived="FALSE"))
+                rows = list(cur.fetchall() or [])
+    return [_template_dfa_row(row) for row in rows]
+
+
+def get_template_dfa(dfa_id: str) -> dict[str, Any] | None:
+    if not is_configured():
+        return None
+    init_schema()
+    query = """
+        SELECT id, name, domain_key, category, origin, graph_json, quality_json,
+               files_json, storage_path, created_at, updated_at
+        FROM template_dfas
+        WHERE id = {placeholder} AND archived = {archived}
+        LIMIT 1
+    """
+    with connection() as conn:
+        if settings.database_driver == "sqlite":
+            result = conn.execute(query.format(placeholder="?", archived="0"), (dfa_id,)).fetchone()
+            row = dict(result) if result else None
+        else:
+            with conn.cursor() as cur:
+                cur.execute(query.format(placeholder="%s", archived="FALSE"), (dfa_id,))
+                row = cur.fetchone()
+    return _template_dfa_row(row) if row else None
+
+
+def archive_template_dfa(dfa_id: str) -> bool:
+    if not is_configured():
+        return False
+    init_schema()
+    now = datetime.now()
+    with connection() as conn:
+        if settings.database_driver == "sqlite":
+            cur = conn.execute(
+                "UPDATE template_dfas SET archived=1, updated_at=? WHERE id=? AND archived=0",
+                (now.isoformat(timespec="seconds"), dfa_id),
+            )
+            return bool(cur.rowcount)
+        with conn.cursor() as cur:
+            cur.execute("UPDATE template_dfas SET archived=TRUE, updated_at=%s WHERE id=%s AND archived=FALSE", (now, dfa_id))
+            return bool(cur.rowcount)

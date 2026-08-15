@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>AutoLogic Studio</title>
-    <link rel="stylesheet" href="./styles.css?v=20260803e" />
+    <link rel="stylesheet" href="./styles.css?v=20260815a" />
   </head>
   <body>
     <div class="app-shell">
@@ -143,6 +143,17 @@
             <span id="apiStatus" class="api-status">连接中</span>
           </div>
         </header>
+
+        <aside id="pagesDemoBanner" class="pages-demo-banner" hidden aria-live="polite">
+          <div>
+            <strong>GitHub Pages 前端展示版</strong>
+            <span>这里可浏览界面、流程与交互设计；DFA 构建、外部数据检索和报告生成需要下载项目并启动 Python 后端。</span>
+          </div>
+          <nav aria-label="展示版相关链接">
+            <a href="https://github.com/zhihongwang12138-web/autologic-subdfa-report-platform" target="_blank" rel="noreferrer">查看完整源码</a>
+            <a href="https://github.com/zhihongwang12138-web/autologic-subdfa-report-platform#quick-start-on-windows" target="_blank" rel="noreferrer">本地启动说明</a>
+          </nav>
+        </aside>
 
         <section id="conversationScroll" class="conversation-scroll">
           <section id="emptyState" class="empty-state">
@@ -382,10 +393,21 @@
       <div class="offline-dfa-controls">
         <label>报告领域 <select id="offlineDfaDomainSelect"><option value="precious_metals">贵金属 / 有色</option><option value="etf">ETF</option><option value="macro">宏观</option><option value="cotton">棉花</option><option value="agriculture">农产品</option></select></label>
         <button id="refreshOfflineDfaButton" type="button">切换结构</button>
+        <div class="offline-dfa-view-controls" role="group" aria-label="写作图显示控制">
+          <button id="offlineDfaZoomOutButton" type="button" title="缩小写作图" aria-label="缩小写作图">−</button>
+          <strong id="offlineDfaZoomLabel" aria-live="polite">100%</strong>
+          <button id="offlineDfaZoomInButton" type="button" title="放大写作图" aria-label="放大写作图">＋</button>
+          <button id="offlineDfaFitButton" type="button">适应窗口</button>
+          <button id="offlineDfaFocusButton" type="button">放大画布</button>
+        </div>
       </div>
       <div id="offlineDfaMetrics" class="offline-dfa-metrics"></div>
       <div class="offline-dfa-workspace">
-        <div class="offline-dfa-canvas"><svg id="offlineDfaSvg" viewBox="0 0 960 540" role="img" aria-label="离线全局写作图"></svg></div>
+        <div class="offline-dfa-canvas">
+          <div id="offlineDfaViewport" class="offline-dfa-viewport">
+            <svg id="offlineDfaSvg" viewBox="0 0 1320 600" role="img" aria-label="离线全局写作图"></svg>
+          </div>
+        </div>
         <aside id="offlineDfaDetail" class="offline-dfa-detail" aria-live="polite">
           <div class="offline-detail-empty"><strong>选择一个段落节点</strong><p>点击左侧节点，查看该段落的执行轨迹。</p></div>
         </aside>
@@ -531,7 +553,7 @@
       <p class="my-dfa-note">用户写作图保存在当前浏览器本机存储中；系统原始写作图始终保持只读并可重新导入。</p>
     </dialog>
 
-    <script src="./i18n.js?v=20260812a"></script>
-    <script src="./app.js?v=20260812a"></script>
+    <script src="./i18n.js?v=20260815a"></script>
+    <script src="./app.js?v=20260815a"></script>
   </body>
 </html>

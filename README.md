@@ -33,6 +33,12 @@ subdfa-report-platform/
 
 Personal queries, custom user writing graphs, raw corpora, retrieved market data, logs, databases, `.env`, and proprietary vendor binaries are intentionally excluded from Git.
 
+## Online frontend showcase
+
+Open the GitHub Pages site: <https://zhihongwang12138-web.github.io/autologic-subdfa-report-platform/>
+
+The Pages site is a static frontend showcase for reviewing the interface, workflow, example prompts, and interaction design. DFA construction, template induction, external-data retrieval, and report generation require the Python backend; use the Windows quick start below for the complete application.
+
 ## Quick start on Windows
 
 Requirements:

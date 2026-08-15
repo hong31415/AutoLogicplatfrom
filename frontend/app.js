@@ -4,6 +4,7 @@ const API_BASE = "/api/v1";
 const STORAGE_KEY = "autologic-history-v2";
 const MY_DFA_STORAGE_KEY = "autologic-user-dfas-v1";
 const COMPOSER_DFA_STORAGE_KEY = "autologic-composer-dfa-v1";
+const IS_GITHUB_PAGES = window.location.hostname.endsWith(".github.io");
 const NODE_W = 208;
 const NODE_H = 78;
 const IS_ENGLISH = window.AutoLogicI18n?.language === "en";
@@ -68,6 +69,8 @@ const state = {
   uploadPreviewDfaId: null,
   offlineDfaTemplate: null,
   offlineDfaSelectedNodeId: null,
+  offlineDfaZoom: 1,
+  offlineDfaFocus: false,
   history: loadHistory()
 };
 
@@ -106,6 +109,7 @@ const els = {
   evidenceRuntime: document.getElementById("evidenceRuntime"),
   modelRuntime: document.getElementById("modelRuntime"),
   apiStatus: document.getElementById("apiStatus"),
+  pagesDemoBanner: document.getElementById("pagesDemoBanner"),
   conversation: document.getElementById("conversationScroll"),
   emptyState: document.getElementById("emptyState"),
   pastMessages: document.getElementById("pastMessages"),
@@ -144,6 +148,12 @@ const els = {
   closeOfflineDfa: document.getElementById("closeOfflineDfaButton"),
   offlineDfaDomain: document.getElementById("offlineDfaDomainSelect"),
   refreshOfflineDfa: document.getElementById("refreshOfflineDfaButton"),
+  offlineDfaZoomOut: document.getElementById("offlineDfaZoomOutButton"),
+  offlineDfaZoomIn: document.getElementById("offlineDfaZoomInButton"),
+  offlineDfaZoomLabel: document.getElementById("offlineDfaZoomLabel"),
+  offlineDfaFit: document.getElementById("offlineDfaFitButton"),
+  offlineDfaFocus: document.getElementById("offlineDfaFocusButton"),
+  offlineDfaViewport: document.getElementById("offlineDfaViewport"),
   offlineDfaSummary: document.getElementById("offlineDfaSummary"),
   offlineDfaMetrics: document.getElementById("offlineDfaMetrics"),
   offlineDfaSvg: document.getElementById("offlineDfaSvg"),
@@ -579,6 +589,9 @@ function updateHistoryRun(patch) {
 }
 
 async function apiPost(path, payload) {
+  if (IS_GITHUB_PAGES) {
+    throw new Error(ui("此操作需要下载项目并启动 Python 后端", "Download the project and start the Python backend to use this feature"));
+  }
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -592,6 +605,9 @@ async function apiPost(path, payload) {
 }
 
 async function apiGet(path) {
+  if (IS_GITHUB_PAGES) {
+    throw new Error(ui("此操作需要下载项目并启动 Python 后端", "Download the project and start the Python backend to use this feature"));
+  }
   const response = await fetch(`${API_BASE}${path}`);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -911,6 +927,17 @@ function scheduleApiCheck(delay) {
 }
 
 async function checkApi() {
+  if (IS_GITHUB_PAGES) {
+    state.health = null;
+    els.runtimeDot.className = "runtime-dot demo";
+    els.runtimeStatus.textContent = ui("前端展示模式", "Frontend Showcase");
+    if (!state.analysis) els.dfaRuntime.textContent = ui("需启动后端", "Backend Required");
+    els.evidenceRuntime.textContent = ui("展示模式", "Showcase Mode");
+    els.modelRuntime.textContent = "-";
+    els.apiStatus.textContent = ui("GitHub Pages 展示版", "GitHub Pages Showcase");
+    els.apiStatus.classList.remove("error");
+    return;
+  }
   if (state.healthCheckInFlight) return;
   state.healthCheckInFlight = true;
   let connected = false;
@@ -1076,6 +1103,11 @@ function latestReportSections() {
 }
 
 function submitComposer() {
+  if (IS_GITHUB_PAGES) {
+    els.apiStatus.textContent = ui("完整运行需启动 Python 后端", "Start the Python backend for a full run");
+    els.pagesDemoBanner?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return;
+  }
   if (canRefineCurrentReport()) {
     refineReport();
     return;
@@ -2523,39 +2555,213 @@ function renderOfflineDfaDetail(template, nodeId) {
   `;
 }
 
+function offlineDfaLabelLines(value) {
+  const text = String(value || "").trim();
+  if (!text) return [""];
+  if (/\s/.test(text)) {
+    const words = text.split(/\s+/);
+    const lines = [];
+    let current = "";
+    words.forEach((word) => {
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > 22 && current) {
+        lines.push(current);
+        current = word;
+      } else current = candidate;
+    });
+    if (current) lines.push(current);
+    return lines.slice(0, 2);
+  }
+  return text.length > 10 ? [text.slice(0, 10), text.slice(10, 20)] : [text];
+}
+
+function compactOfflineEdgeLabel(edge, rootId) {
+  const condition = String(edge.condition_label || "");
+  const lower = condition.toLowerCase();
+  if (edge.source === rootId) return ui("意图匹配", "Query intent");
+  if (condition.includes("唯一稳定") || lower.includes("stable") || String(edge.predicate || "").toUpperCase() === "TRUE") return ui("稳定后继", "Stable next");
+  if (condition.includes("风险") || lower.includes("risk")) return ui("风险信号", "Risk signal");
+  if (condition.includes("需求") || lower.includes("demand")) return ui("需求增强", "Demand signal");
+  if (condition.includes("价格") || lower.includes("price")) return ui("价格增强", "Price signal");
+  return condition.length > 14 ? `${condition.slice(0, 13)}…` : condition;
+}
+
+function offlineDfaEdgeEndpoints(source, target) {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  const sourceScale = Math.min(118 / Math.max(1, Math.abs(dx)), 53 / Math.max(1, Math.abs(dy)));
+  const targetScale = Math.min(118 / Math.max(1, Math.abs(dx)), 53 / Math.max(1, Math.abs(dy)));
+  return {
+    x1: source.x + dx * sourceScale,
+    y1: source.y + dy * sourceScale,
+    x2: target.x - dx * targetScale,
+    y2: target.y - dy * targetScale
+  };
+}
+
+function applyOfflineDfaView() {
+  const svg = els.offlineDfaSvg;
+  const width = Number(svg.dataset.graphWidth || 1320);
+  const height = Number(svg.dataset.graphHeight || 600);
+  const zoom = Math.max(0.45, Math.min(1.6, Number(state.offlineDfaZoom || 1)));
+  state.offlineDfaZoom = zoom;
+  svg.style.width = `${Math.round(width * zoom)}px`;
+  svg.style.height = `${Math.round(height * zoom)}px`;
+  els.offlineDfaZoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+  els.offlineDfaZoomOut.disabled = zoom <= 0.45;
+  els.offlineDfaZoomIn.disabled = zoom >= 1.6;
+  els.offlineDfaModal.classList.toggle("graph-focus", state.offlineDfaFocus);
+  els.offlineDfaFocus.textContent = state.offlineDfaFocus ? ui("显示节点详情", "Show Node Details") : ui("放大画布", "Expand Canvas");
+}
+
+function setOfflineDfaZoom(value) {
+  const viewport = els.offlineDfaViewport;
+  const oldWidth = Math.max(1, viewport.scrollWidth);
+  const oldHeight = Math.max(1, viewport.scrollHeight);
+  const centerX = (viewport.scrollLeft + viewport.clientWidth / 2) / oldWidth;
+  const centerY = (viewport.scrollTop + viewport.clientHeight / 2) / oldHeight;
+  state.offlineDfaZoom = Math.max(0.45, Math.min(1.6, value));
+  applyOfflineDfaView();
+  window.requestAnimationFrame(() => {
+    viewport.scrollLeft = centerX * viewport.scrollWidth - viewport.clientWidth / 2;
+    viewport.scrollTop = centerY * viewport.scrollHeight - viewport.clientHeight / 2;
+  });
+}
+
+function fitOfflineDfaToViewport() {
+  const width = Number(els.offlineDfaSvg.dataset.graphWidth || 1320);
+  const height = Number(els.offlineDfaSvg.dataset.graphHeight || 600);
+  const availableWidth = Math.max(1, els.offlineDfaViewport.clientWidth - 32);
+  const availableHeight = Math.max(1, els.offlineDfaViewport.clientHeight - 32);
+  state.offlineDfaZoom = Math.max(0.45, Math.min(1, availableWidth / width, availableHeight / height));
+  applyOfflineDfaView();
+  els.offlineDfaViewport.scrollTo({left: 0, top: 0, behavior: "smooth"});
+}
+
 function drawOfflineDfa(template) {
   const svg = els.offlineDfaSvg;
   const nodes = template?.nodes || [];
   const edges = template?.edges || [];
+  const nonRootCount = Math.max(0, nodes.length - 1);
+  let columnCounts = [];
+  if (nonRootCount <= 3) columnCounts = [nonRootCount];
+  else if (nonRootCount === 4) columnCounts = [2, 2];
+  else if (nonRootCount === 5) columnCounts = [2, 3];
+  else if (nonRootCount === 6) columnCounts = [2, 2, 2];
+  else if (nonRootCount === 7) columnCounts = [2, 3, 2];
+  else {
+    let remaining = nonRootCount;
+    while (remaining > 0) {
+      columnCounts.push(Math.min(3, remaining));
+      remaining -= 3;
+    }
+  }
+  const graphWidth = Math.max(980, 700 + Math.max(0, columnCounts.length - 1) * 400);
+  const graphHeight = 660;
+  svg.dataset.graphWidth = graphWidth;
+  svg.dataset.graphHeight = graphHeight;
+  svg.setAttribute("viewBox", `0 0 ${graphWidth} ${graphHeight}`);
   svg.innerHTML = "";
   if (!nodes.length) {
-    svg.innerHTML = `<text x="480" y="270" text-anchor="middle" class="offline-empty">${ui("本地尚未找到该领域的写作图缓存", "No local writing-graph cache was found for this domain.")}</text>`;
+    svg.innerHTML = `<text x="${graphWidth / 2}" y="${graphHeight / 2}" text-anchor="middle" class="offline-empty">${ui("本地尚未找到该领域的写作图缓存", "No local writing-graph cache was found for this domain.")}</text>`;
+    applyOfflineDfaView();
     renderOfflineDfaDetail(null, null);
     return;
   }
   renderOfflineDfaDetail(template, state.offlineDfaSelectedNodeId);
   const orderedNodes = [...nodes].sort((left, right) => (Number(left.level) || 0) - (Number(right.level) || 0));
-  const positions = Object.fromEntries(orderedNodes.map((node, index) => [node.id, {
-    x: 100 + (index / Math.max(1, orderedNodes.length - 1)) * 760,
-    y: index === 0 ? 270 : [135, 405, 135, 270, 405][(index - 1) % 5]
-  }]));
-  edges.forEach((edge) => {
+  const rootNode = orderedNodes.find((node) => node.parent == null || Number(node.level || 0) === 0) || orderedNodes[0];
+  const positions = {};
+  positions[rootNode.id] = {x: 145, y: 330};
+  const nonRootNodes = orderedNodes.filter((node) => node.id !== rootNode.id);
+  let nodeIndex = 0;
+  columnCounts.forEach((count, columnIndex) => {
+    const rowPositions = count === 1 ? [330] : count === 2 ? [160, 500] : [110, 330, 550];
+    rowPositions.forEach((y) => {
+      const node = nonRootNodes[nodeIndex];
+      if (node) positions[node.id] = {x: 430 + columnIndex * 400, y};
+      nodeIndex += 1;
+    });
+  });
+
+  svg.innerHTML = `
+    <defs>
+      <marker id="offline-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z"></path>
+      </marker>
+    </defs>`;
+
+  const occupiedLabelBoxes = [];
+  const nodeBoxes = Object.values(positions).map((point) => ({
+    left: point.x - 130, right: point.x + 130, top: point.y - 65, bottom: point.y + 65
+  }));
+  const boxesOverlap = (left, right) => !(
+    left.right + 6 < right.left || left.left - 6 > right.right
+    || left.bottom + 6 < right.top || left.top - 6 > right.bottom
+  );
+  const placeEdgeLabel = (source, target, width, height, edgeIndex) => {
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const normalX = -dy / length;
+    const normalY = dx / length;
+    const candidates = [];
+    [30, -30, 54, -54, 78, -78].forEach((offset) => candidates.push({t: 0.5, offset}));
+    [0.38, 0.62].forEach((t) => [34, -34, 62, -62].forEach((offset) => candidates.push({t, offset})));
+    candidates.push({t: edgeIndex % 2 ? 0.42 : 0.58, offset: edgeIndex % 2 ? 88 : -88});
+    let fallback = null;
+    for (const candidate of candidates) {
+      const x = source.x + dx * candidate.t + normalX * candidate.offset;
+      const y = source.y + dy * candidate.t + normalY * candidate.offset;
+      const box = {left: x - width / 2, right: x + width / 2, top: y - height / 2, bottom: y + height / 2};
+      if (!fallback) fallback = {x, y, box};
+      const withinCanvas = box.left >= 12 && box.right <= graphWidth - 12 && box.top >= 12 && box.bottom <= graphHeight - 12;
+      if (withinCanvas && !nodeBoxes.some((nodeBox) => boxesOverlap(box, nodeBox)) && !occupiedLabelBoxes.some((labelBox) => boxesOverlap(box, labelBox))) {
+        occupiedLabelBoxes.push(box);
+        return {x, y};
+      }
+    }
+    occupiedLabelBoxes.push(fallback.box);
+    return {x: fallback.x, y: fallback.y};
+  };
+
+  edges.forEach((edge, edgeIndex) => {
     const source = positions[edge.source];
     const target = positions[edge.target];
     if (!source || !target) return;
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", source.x); line.setAttribute("y1", source.y); line.setAttribute("x2", target.x); line.setAttribute("y2", target.y);
-    line.setAttribute("class", "offline-dfa-edge");
-    svg.appendChild(line);
+    const endpoints = offlineDfaEdgeEndpoints(source, target);
+    const edgeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    edgeGroup.setAttribute("class", "offline-dfa-edge-group");
+    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    title.textContent = String(edge.condition_label || ui("稳定直接转移", "Stable Direct Transition"));
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", `M ${endpoints.x1} ${endpoints.y1} L ${endpoints.x2} ${endpoints.y2}`);
+    path.setAttribute("class", "offline-dfa-edge");
+    path.setAttribute("marker-end", "url(#offline-arrow)");
+    edgeGroup.append(title, path);
     if (edge.condition_label) {
+      const compactLabel = compactOfflineEdgeLabel(edge, rootNode.id);
+      const labelWidth = Math.max(90, Math.min(174, compactLabel.length * (IS_ENGLISH ? 8.2 : 15) + 24));
+      const labelHeight = 30;
+      const labelPoint = placeEdgeLabel(source, target, labelWidth, labelHeight, edgeIndex);
+      const labelX = labelPoint.x;
+      const labelY = labelPoint.y;
+      const labelGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      labelGroup.setAttribute("class", "offline-dfa-edge-label-group");
+      const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      background.setAttribute("x", labelX - labelWidth / 2); background.setAttribute("y", labelY - labelHeight / 2);
+      background.setAttribute("width", labelWidth); background.setAttribute("height", labelHeight); background.setAttribute("rx", "15");
       const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      label.setAttribute("x", (source.x + target.x) / 2); label.setAttribute("y", (source.y + target.y) / 2 - 7);
-      label.setAttribute("text-anchor", "middle"); label.setAttribute("class", "offline-dfa-edge-label");
-      label.textContent = String(edge.condition_label).slice(0, 18);
-      svg.appendChild(label);
+      label.setAttribute("x", labelX); label.setAttribute("y", labelY + 1);
+      label.setAttribute("text-anchor", "middle"); label.setAttribute("dominant-baseline", "middle"); label.setAttribute("class", "offline-dfa-edge-label");
+      label.textContent = compactLabel;
+      labelGroup.append(background, label);
+      edgeGroup.appendChild(labelGroup);
     }
+    svg.appendChild(edgeGroup);
   });
-  nodes.forEach((node) => {
+
+  orderedNodes.forEach((node) => {
     const point = positions[node.id];
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("class", `offline-dfa-node${node.id === state.offlineDfaSelectedNodeId ? " active" : ""}`);
@@ -2563,15 +2769,23 @@ function drawOfflineDfa(template) {
     group.setAttribute("tabindex", "0");
     group.setAttribute("aria-label", ui(`查看 ${node.label || node.id} 的段落执行轨迹`, `View the section-level execution trace for ${node.label || node.id}`));
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", point.x - 82); rect.setAttribute("y", point.y - 31); rect.setAttribute("width", "164"); rect.setAttribute("height", "62"); rect.setAttribute("rx", "5");
+    rect.setAttribute("x", point.x - 118); rect.setAttribute("y", point.y - 53); rect.setAttribute("width", "236"); rect.setAttribute("height", "106"); rect.setAttribute("rx", "9");
     const id = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    id.setAttribute("x", point.x - 68); id.setAttribute("y", point.y - 10); id.setAttribute("class", "offline-dfa-node-id"); id.textContent = node.id;
+    id.setAttribute("x", point.x - 98); id.setAttribute("y", point.y - 29); id.setAttribute("class", "offline-dfa-node-id"); id.textContent = node.id;
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    label.setAttribute("x", point.x - 68); label.setAttribute("y", point.y + 8); label.setAttribute("class", "offline-dfa-node-label"); label.textContent = String(node.label || node.id).slice(0, 16);
+    const labelLines = offlineDfaLabelLines(node.label || node.id);
+    label.setAttribute("x", point.x - 98); label.setAttribute("y", point.y - (labelLines.length > 1 ? 7 : -2)); label.setAttribute("class", "offline-dfa-node-label");
+    labelLines.forEach((line, index) => {
+      const span = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+      span.setAttribute("x", point.x - 98);
+      span.setAttribute("dy", index === 0 ? "0" : "20");
+      span.textContent = line;
+      label.appendChild(span);
+    });
     const support = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    support.setAttribute("x", point.x - 68); support.setAttribute("y", point.y + 22); support.setAttribute("class", "offline-dfa-node-support");
+    support.setAttribute("x", point.x - 98); support.setAttribute("y", point.y + 42); support.setAttribute("class", "offline-dfa-node-support");
     support.textContent = node.support_documents
-      ? ui(`历史支持 ${node.support_documents} 篇`, `${node.support_documents} supporting documents`)
+      ? ui(`历史支持 ${Number(node.support_documents).toLocaleString()} 篇`, `${Number(node.support_documents).toLocaleString()} supporting documents`)
       : ui("起始路由状态", "Initial routing state");
     const selectNode = () => {
       state.offlineDfaSelectedNodeId = node.id;
@@ -2586,6 +2800,7 @@ function drawOfflineDfa(template) {
     });
     group.append(rect, id, label, support); svg.appendChild(group);
   });
+  applyOfflineDfaView();
 }
 
 async function openOfflineDfa() {
@@ -2623,6 +2838,7 @@ async function openOfflineDfa() {
       [ui("保留阈值", "Retention Threshold"), induction.frequency_threshold != null ? `${(Number(induction.frequency_threshold) * 100).toFixed(1)}%` : "-"]
     ].map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
     drawOfflineDfa(template);
+    window.requestAnimationFrame(fitOfflineDfaToViewport);
   } catch (error) {
     state.offlineDfaTemplate = null;
     state.offlineDfaSelectedNodeId = null;
@@ -3362,6 +3578,14 @@ function bindEvents() {
   els.offlineDfa.addEventListener("click", openOfflineDfa);
   els.closeOfflineDfa.addEventListener("click", () => els.offlineDfaModal.close());
   els.refreshOfflineDfa.addEventListener("click", openOfflineDfa);
+  els.offlineDfaZoomOut.addEventListener("click", () => setOfflineDfaZoom(state.offlineDfaZoom - 0.15));
+  els.offlineDfaZoomIn.addEventListener("click", () => setOfflineDfaZoom(state.offlineDfaZoom + 0.15));
+  els.offlineDfaFit.addEventListener("click", fitOfflineDfaToViewport);
+  els.offlineDfaFocus.addEventListener("click", () => {
+    state.offlineDfaFocus = !state.offlineDfaFocus;
+    applyOfflineDfaView();
+    window.requestAnimationFrame(fitOfflineDfaToViewport);
+  });
   els.uploadDfa.addEventListener("click", openUploadDfaBuilder);
   els.closeUploadDfa.addEventListener("click", closeUploadDfaBuilder);
   els.uploadDfaTheta.addEventListener("input", () => {
@@ -3513,8 +3737,12 @@ function bindEvents() {
 initializeTimeRangeChoices();
 updateThresholdPresetUi();
 renderComposerDfaOptions();
+if (IS_GITHUB_PAGES) {
+  document.querySelector(".workspace")?.classList.add("pages-demo-mode");
+  if (els.pagesDemoBanner) els.pagesDemoBanner.hidden = false;
+}
 bindEvents();
-loadUploadedDfaLibrary();
+if (!IS_GITHUB_PAGES) loadUploadedDfaLibrary();
 renderHistory();
 autoResizeComposer();
 renderPending();

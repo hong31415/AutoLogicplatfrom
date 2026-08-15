@@ -32,8 +32,8 @@
     "等待任务": "Waiting for Task",
     "证据驱动报告工作台": "Evidence-Driven Report Workspace",
     "连接中": "Connecting",
-    "GitHub Pages 前端展示版": "GitHub Pages Frontend Showcase",
-    "这里可浏览界面、流程与交互设计；DFA 构建、外部数据检索和报告生成需要下载项目并启动 Python 后端。": "Explore the interface, workflow, and interaction design here. DFA construction, external-data retrieval, and report generation require the downloaded project and its Python backend.",
+    "GitHub Pages 在线交互演示版": "GitHub Pages Interactive Demo",
+    "可直接体验 DFA 构建、状态匹配、执行图与报告组装；模板构建记录保存在当前浏览器数据库中，实时市场数据与 AI 结论需要部署 Python 后端。": "Try DFA construction, state matching, execution graphs, and report assembly directly. Template-built DFA records stay in this browser database; live market data and AI conclusions require the Python backend.",
     "展示版相关链接": "Showcase Links",
     "查看完整源码": "View Full Source",
     "本地启动说明": "Local Setup Guide",
@@ -403,19 +403,32 @@
   window.AutoLogicI18n = { language, translateText, translateTree };
   translateTree(document.body);
   if (language === "en") {
-    new MutationObserver((mutations) => {
+    let translationFrame = 0;
+    const pendingRoots = new Set();
+    const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        mutation.addedNodes.forEach(translateTree);
-        if (mutation.type === "characterData") translateTree(mutation.target);
-        if (mutation.type === "attributes") translateElement(mutation.target);
+        mutation.addedNodes.forEach((node) => pendingRoots.add(node));
+        if (mutation.type === "characterData") pendingRoots.add(mutation.target);
+        if (mutation.type === "attributes") pendingRoots.add(mutation.target);
       }
-    }).observe(document.body, {
+      if (translationFrame) return;
+      translationFrame = window.requestAnimationFrame(() => {
+        translationFrame = 0;
+        const roots = [...pendingRoots];
+        pendingRoots.clear();
+        observer.disconnect();
+        roots.forEach(translateTree);
+        observer.observe(document.body, observerOptions);
+      });
+    });
+    const observerOptions = {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: true,
       attributeFilter: ["placeholder", "title", "aria-label", "alt"]
-    });
+    };
+    observer.observe(document.body, observerOptions);
   }
 
   const button = document.getElementById("languageToggleButton");

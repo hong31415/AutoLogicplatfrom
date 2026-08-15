@@ -590,7 +590,8 @@ function updateHistoryRun(patch) {
 
 async function apiPost(path, payload) {
   if (IS_GITHUB_PAGES) {
-    throw new Error(ui("此操作需要下载项目并启动 Python 后端", "Download the project and start the Python backend to use this feature"));
+    if (!window.AutoLogicPagesDemo) throw new Error(ui("在线演示引擎加载失败，请刷新页面", "The online demo engine failed to load. Refresh the page."));
+    return window.AutoLogicPagesDemo.apiPost(path, payload);
   }
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -606,7 +607,8 @@ async function apiPost(path, payload) {
 
 async function apiGet(path) {
   if (IS_GITHUB_PAGES) {
-    throw new Error(ui("此操作需要下载项目并启动 Python 后端", "Download the project and start the Python backend to use this feature"));
+    if (!window.AutoLogicPagesDemo) throw new Error(ui("在线演示引擎加载失败，请刷新页面", "The online demo engine failed to load. Refresh the page."));
+    return window.AutoLogicPagesDemo.apiGet(path);
   }
   const response = await fetch(`${API_BASE}${path}`);
   const data = await response.json().catch(() => ({}));
@@ -901,7 +903,10 @@ async function startUploadDfaBuild() {
 
 async function archiveUploadedDfa(id) {
   const dfa = state.uploadedDfas.find((item) => item.id === id);
-  if (!dfa || !window.confirm(`确定归档“${dfa.name}”吗？已上传的源文件仍保留在本机数据目录中。`)) return;
+  const storageNote = IS_GITHUB_PAGES
+    ? "派生 DFA 与文件元数据将从当前列表中归档。"
+    : "已上传的源文件仍保留在本机数据目录中。";
+  if (!dfa || !window.confirm(`确定归档“${dfa.name}”吗？${storageNote}`)) return;
   await apiPost("/template-dfas/archive", {id: dfa.serverId || dfa.id});
   if (state.composerDfaId === id) state.composerDfaId = "system";
   if (state.uploadPreviewDfaId === id) els.uploadDfaPreview.hidden = true;
@@ -929,12 +934,12 @@ function scheduleApiCheck(delay) {
 async function checkApi() {
   if (IS_GITHUB_PAGES) {
     state.health = null;
-    els.runtimeDot.className = "runtime-dot demo";
-    els.runtimeStatus.textContent = ui("前端展示模式", "Frontend Showcase");
-    if (!state.analysis) els.dfaRuntime.textContent = ui("需启动后端", "Backend Required");
-    els.evidenceRuntime.textContent = ui("展示模式", "Showcase Mode");
-    els.modelRuntime.textContent = "-";
-    els.apiStatus.textContent = ui("GitHub Pages 展示版", "GitHub Pages Showcase");
+    els.runtimeDot.className = "runtime-dot ready";
+    els.runtimeStatus.textContent = ui("在线演示已就绪", "Online Demo Ready");
+    if (!state.analysis) els.dfaRuntime.textContent = ui("等待任务", "Waiting for Task");
+    els.evidenceRuntime.textContent = ui("内置演示证据", "Built-in Demo Evidence");
+    els.modelRuntime.textContent = "Browser Demo";
+    els.apiStatus.textContent = ui("在线演示引擎 · 浏览器数据库", "Online Demo · Browser Database");
     els.apiStatus.classList.remove("error");
     return;
   }
@@ -1103,11 +1108,6 @@ function latestReportSections() {
 }
 
 function submitComposer() {
-  if (IS_GITHUB_PAGES) {
-    els.apiStatus.textContent = ui("完整运行需启动 Python 后端", "Start the Python backend for a full run");
-    els.pagesDemoBanner?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    return;
-  }
   if (canRefineCurrentReport()) {
     refineReport();
     return;
@@ -3283,7 +3283,7 @@ async function playEventRange(token, startIndex, endIndex) {
     state.eventIndex = index;
     renderCurrentEvent();
     const event = state.events[index] || {};
-    const delay = event.type === "finalized"
+    const delay = IS_GITHUB_PAGES ? 120 : event.type === "finalized"
       ? 1500
       : ["dfa", "query", "match", "subdfa"].includes(event.stage)
         ? 850
@@ -3742,7 +3742,7 @@ if (IS_GITHUB_PAGES) {
   if (els.pagesDemoBanner) els.pagesDemoBanner.hidden = false;
 }
 bindEvents();
-if (!IS_GITHUB_PAGES) loadUploadedDfaLibrary();
+loadUploadedDfaLibrary();
 renderHistory();
 autoResizeComposer();
 renderPending();

@@ -35,6 +35,8 @@ Personal queries, custom user writing graphs, raw corpora, retrieved market data
 
 ## Online frontend showcase
 
+Open the anonymous interactive frontend: <https://anonymous.4open.science/w/abfbab90-7d9f-49d0-8616-a000137fd930/>
+
 The anonymous review mirror can expose the static frontend as an interactive browser demo. It constructs a query-specific DFA, visualizes state matching and execution, assembles a clearly labelled demo report, and stores uploaded-template DFA records in IndexedDB on the current device. Live market data, cross-device persistence, and model-generated conclusions require the Python backend; use the Windows quick start below for the complete application.
 
 ## Quick start on Windows

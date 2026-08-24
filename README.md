@@ -105,7 +105,7 @@ SUBDFA_MARKET_DATA_SOURCE=auto
 TUSHARE_TOKEN=
 ```
 
-iFinD is optional and requires an official SDK installation and your own licensed account. See [`vendor/README.md`](vendor/README.md).
+iFinD is optional and requires an official SDK installation and your own licensed account. See `vendor/README.md`.
 
 ### Database
 
@@ -191,7 +191,7 @@ Content-Type: application/json
 
 4. Confirm that `.env`, logs, databases, `vendor/ifind-sdk/`, personal query caches, and raw corpora are absent from `git status`.
 
-See [`SECURITY.md`](SECURITY.md) for the full policy.
+See `SECURITY.md` for the full policy.
 
 ## License
 

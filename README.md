@@ -35,7 +35,7 @@ Personal queries, custom user writing graphs, raw corpora, retrieved market data
 
 ## Online frontend showcase
 
-Open the GitHub Pages site: <https://hong31415.github.io/AutoLogicplatfrom/>
+Open the GitHub Pages site: <https://anonymous.4open.science.github.io/AutoLogicplatfrom/>
 
 The Pages site includes an interactive browser demo: it constructs a query-specific DFA, visualizes state matching and execution, assembles a clearly labelled demo report, and stores uploaded-template DFA records in IndexedDB on the current device. Live market data, cross-device persistence, and model-generated conclusions require the Python backend; use the Windows quick start below for the complete application.
 

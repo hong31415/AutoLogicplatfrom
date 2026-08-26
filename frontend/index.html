@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light" />
     <meta name="google" content="notranslate" />
     <title>AutoLogic Studio</title>
-    <link rel="stylesheet" href="./styles.css?v=20260815b" />
+    <link rel="stylesheet" href="./styles.css?v=20260826dfa" />
   </head>
   <body>
     <div class="app-shell">
@@ -32,12 +32,12 @@
 
         <button id="offlineDfaButton" class="offline-dfa-button" type="button">
           <span aria-hidden="true">◇</span>
-          查看离线写作图
+          查看全局写作 DFA
         </button>
 
         <button id="myDfaButton" class="my-dfa-button" type="button">
           <span aria-hidden="true">✦</span>
-          我的写作图
+          我的 DFA
         </button>
 
         <button id="uploadDfaButton" class="upload-dfa-button" type="button">
@@ -109,11 +109,11 @@
                 <input id="remoteEmbeddingInput" type="checkbox" />
               </label>
               <label class="toggle-row">
-                <span>重新诱导写作图</span>
+                <span>重新诱导全局写作 DFA</span>
                 <input id="sourceLearningInput" type="checkbox" />
               </label>
               <label class="toggle-row">
-                <span>忽略本地写作图缓存</span>
+                <span>忽略本地全局写作 DFA 缓存</span>
                 <input id="forceRelearnInput" type="checkbox" />
               </label>
             </div>
@@ -126,7 +126,7 @@
             <strong id="runtimeStatus">正在检查服务</strong>
           </div>
           <dl>
-            <div><dt>写作图</dt><dd id="dfaRuntime">等待任务</dd></div>
+            <div><dt>DFA</dt><dd id="dfaRuntime">等待任务</dd></div>
             <div><dt>证据源</dt><dd id="evidenceRuntime">本地材料</dd></div>
             <div><dt>模型</dt><dd id="modelRuntime">-</dd></div>
           </dl>
@@ -148,7 +148,7 @@
         <aside id="pagesDemoBanner" class="pages-demo-banner" hidden aria-live="polite">
           <div>
             <strong>GitHub Pages 在线交互演示版</strong>
-            <span>可直接体验 DFA 构建、状态匹配、执行图与报告组装；模板构建记录保存在当前浏览器数据库中，实时市场数据与 AI 结论需要部署 Python 后端。</span>
+            <span>可直接体验全局写作 DFA、状态匹配、Query-Specific Sub-DFA 与报告组装；模板构建记录保存在当前浏览器数据库中，实时市场数据与 AI 结论需要部署 Python 后端。</span>
           </div>
           <span>完整源码与本地启动说明请查看当前匿名仓库的 README。</span>
         </aside>
@@ -162,13 +162,13 @@
             <p class="empty-kicker">AutoLogic Studio</p>
             <h2>让证据决定报告的下一步</h2>
             <div class="method-flow" aria-label="AutoLogic 方法流程">
-              <span><b>01</b> 全局写作图</span>
+              <span><b>01</b> 全局写作 DFA</span>
               <i aria-hidden="true">→</i>
               <span><b>02</b> 对话解析</span>
               <i aria-hidden="true">→</i>
               <span><b>03</b> 状态匹配</span>
               <i aria-hidden="true">→</i>
-              <span><b>04</b> 查询执行图</span>
+              <span><b>04</b> Query-Specific Sub-DFA</span>
               <i aria-hidden="true">→</i>
               <span><b>05</b> 数据证据</span>
               <i aria-hidden="true">→</i>
@@ -210,16 +210,16 @@
                       <h2 id="runTitle">正在准备 AutoLogic</h2>
                       <span id="runBadge" class="run-badge running">运行中</span>
                     </div>
-                    <p id="runSubtitle">正在载入离线全局写作图</p>
+                    <p id="runSubtitle">正在载入离线全局写作 DFA</p>
                   </div>
                   <button id="skipAnimationButton" class="icon-text-button" type="button" title="跳到最终结果">跳到结果</button>
                 </header>
 
                 <div id="stageRail" class="stage-rail">
-                  <button type="button" data-stage="dfa"><b>01</b><span>全局写作图</span></button>
+                  <button type="button" data-stage="dfa"><b>01</b><span>全局写作 DFA</span></button>
                   <button type="button" data-stage="query"><b>02</b><span>对话解析</span></button>
                   <button type="button" data-stage="match"><b>03</b><span>状态匹配</span></button>
-                  <button type="button" data-stage="subdfa"><b>04</b><span>查询执行图</span></button>
+                  <button type="button" data-stage="subdfa"><b>04</b><span>Query-Specific Sub-DFA</span></button>
                   <button type="button" data-stage="evidence"><b>05</b><span>数据与证据</span></button>
                   <button type="button" data-stage="assembly"><b>06</b><span>报告生成</span></button>
                 </div>
@@ -247,7 +247,7 @@
                     <div class="pane-heading">
                       <div>
                         <span class="pane-kicker">Online Execution</span>
-                        <h3>查询执行图与执行轨迹</h3>
+                        <h3>Query-Specific Sub-DFA 与执行轨迹</h3>
                       </div>
                       <span id="traceCounter" class="trace-counter">0 / 0</span>
                     </div>
@@ -255,13 +255,13 @@
                     <div class="graph-toolbar">
                       <div class="graph-view-tabs" role="tablist" aria-label="执行视图">
                         <button class="active" type="button" data-view="construction">动态构建</button>
-                        <button type="button" data-view="dfa">全局写作图</button>
+                        <button type="button" data-view="dfa">全局写作 DFA</button>
                       </div>
-                      <button id="graphExpandButton" class="graph-expand-button" type="button" title="放大查看查询执行图" aria-label="放大查看查询执行图">⛶</button>
+                      <button id="graphExpandButton" class="graph-expand-button" type="button" title="放大查看 Query-Specific Sub-DFA" aria-label="放大查看 Query-Specific Sub-DFA">⛶</button>
                     </div>
-                    <div id="graphSummary" class="graph-summary">等待查询执行图构建</div>
+                    <div id="graphSummary" class="graph-summary">等待 Query-Specific Sub-DFA 构建</div>
                     <div id="graphShell" class="graph-shell">
-                      <svg id="dfaSvg" viewBox="0 0 720 420" role="img" aria-label="查询执行图"></svg>
+                      <svg id="dfaSvg" viewBox="0 0 720 420" role="img" aria-label="Query-Specific Sub-DFA"></svg>
                     </div>
 
                     <section class="decision-panel">
@@ -315,23 +315,23 @@
               <div class="composer-options">
                 <button id="modeButton" type="button" title="当前运行模式"><span></span> 证据驱动</button>
                 <details id="composerDfaSourceControl" class="composer-dfa-source-control">
-                  <summary aria-label="选择生成报告使用的写作图">
+                  <summary aria-label="选择生成报告使用的 DFA">
                     <span aria-hidden="true">✦</span>
-                    <strong>结构 · <b id="composerDfaSourceLabel">系统写作图</b></strong>
+                    <strong>结构 · <b id="composerDfaSourceLabel">系统写作 DFA</b></strong>
                     <small id="composerDfaSourceMeta">按垂类自动选择</small>
                   </summary>
                   <div class="composer-dfa-source-popover">
                     <header>
-                      <strong>本次生成使用的写作图</strong>
-                      <small>系统结构或你保存的自定义结构，将用于构建本次查询执行图。</small>
+                      <strong>本次生成使用的 DFA</strong>
+                      <small>系统 DFA 或你保存的自定义 DFA，将用于构建本次 Query-Specific Sub-DFA。</small>
                     </header>
                     <label>
-                      <span>写作图来源</span>
-                      <select id="composerDfaSelect" aria-label="选择生成使用的写作图">
-                        <option value="system">系统写作图 · 按垂类自动选择</option>
+                      <span>DFA 来源</span>
+                      <select id="composerDfaSelect" aria-label="选择生成使用的 DFA">
+                        <option value="system">系统写作 DFA · 按垂类自动选择</option>
                       </select>
                     </label>
-                    <div id="composerDfaSourceHint" class="composer-dfa-source-hint">当前将使用系统训练得到的全局写作图。</div>
+                    <div id="composerDfaSourceHint" class="composer-dfa-source-hint">当前将使用系统诱导得到的全局写作 DFA。</div>
                     <div class="composer-dfa-source-actions">
                       <button id="manageComposerDfaButton" type="button">手动构建 / 编辑</button>
                       <button id="uploadComposerDfaButton" type="button">上传模板自动构建</button>
@@ -339,17 +339,17 @@
                   </div>
                 </details>
                 <details id="composerThresholdControl" class="composer-threshold-control">
-                  <summary aria-label="设置写作图信息范围">
+                  <summary aria-label="设置 DFA 状态覆盖范围">
                     <span aria-hidden="true">◇</span>
-                    <strong>写作图 · <b id="thresholdPresetButtonLabel">均衡</b></strong>
+                    <strong>DFA · <b id="thresholdPresetButtonLabel">均衡</b></strong>
                     <small id="thresholdPresetButtonMeta">θ 0.50 · τ 0.20 · Top-3</small>
                   </summary>
                   <div class="composer-threshold-popover">
                     <header>
-                      <strong id="thresholdPresetLabel">写作图信息范围</strong>
+                      <strong id="thresholdPresetLabel">DFA 状态覆盖范围</strong>
                       <small id="thresholdPresetSummary">均衡 · 兼顾核心与覆盖 · θ 0.50 / τ 0.20 / Top-3</small>
                     </header>
-                    <div class="threshold-preset-grid compact" role="group" aria-label="选择写作图信息范围">
+                    <div class="threshold-preset-grid compact" role="group" aria-label="选择 DFA 状态覆盖范围">
                       <button type="button" data-threshold-preset="core"><strong>核心</strong><span>θ .70 · τ .45 · Top-2</span></button>
                       <button type="button" data-threshold-preset="balanced" class="active" aria-pressed="true"><strong>均衡</strong><span>θ .50 · τ .20 · Top-3</span></button>
                       <button type="button" data-threshold-preset="comprehensive"><strong>全面</strong><span>θ .30 · τ .10 · Top-8</span></button>
@@ -383,7 +383,7 @@
       <header>
         <div>
           <span class="pane-kicker">Offline Writing Automaton</span>
-          <h2>离线全局写作图</h2>
+          <h2>离线全局写作 DFA</h2>
           <p id="offlineDfaSummary">读取本地已诱导的写作结构。</p>
         </div>
         <button id="closeOfflineDfaButton" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button>
@@ -391,10 +391,10 @@
       <div class="offline-dfa-controls">
         <label>报告领域 <select id="offlineDfaDomainSelect"><option value="precious_metals">贵金属 / 有色</option><option value="etf">ETF</option><option value="macro">宏观</option><option value="cotton">棉花</option><option value="agriculture">农产品</option></select></label>
         <button id="refreshOfflineDfaButton" type="button">切换结构</button>
-        <div class="offline-dfa-view-controls" role="group" aria-label="写作图显示控制">
-          <button id="offlineDfaZoomOutButton" type="button" title="缩小写作图" aria-label="缩小写作图">−</button>
+        <div class="offline-dfa-view-controls" role="group" aria-label="DFA 显示控制">
+          <button id="offlineDfaZoomOutButton" type="button" title="缩小 DFA" aria-label="缩小 DFA">−</button>
           <strong id="offlineDfaZoomLabel" aria-live="polite">100%</strong>
-          <button id="offlineDfaZoomInButton" type="button" title="放大写作图" aria-label="放大写作图">＋</button>
+          <button id="offlineDfaZoomInButton" type="button" title="放大 DFA" aria-label="放大 DFA">＋</button>
           <button id="offlineDfaFitButton" type="button">适应窗口</button>
           <button id="offlineDfaFocusButton" type="button">放大画布</button>
         </div>
@@ -403,21 +403,21 @@
       <div class="offline-dfa-workspace">
         <div class="offline-dfa-canvas">
           <div id="offlineDfaViewport" class="offline-dfa-viewport">
-            <svg id="offlineDfaSvg" viewBox="0 0 1320 600" role="img" aria-label="离线全局写作图"></svg>
+            <svg id="offlineDfaSvg" viewBox="0 0 1320 600" role="img" aria-label="离线全局写作 DFA"></svg>
           </div>
         </div>
         <aside id="offlineDfaDetail" class="offline-dfa-detail" aria-live="polite">
           <div class="offline-detail-empty"><strong>选择一个段落节点</strong><p>点击左侧节点，查看该段落的执行轨迹。</p></div>
         </aside>
       </div>
-      <p class="offline-dfa-note">该图来自本机缓存的全局写作图；本窗口不会调用市场数据或生成报告。</p>
+      <p class="offline-dfa-note">该 DFA 来自本机缓存的全局写作 DFA；本窗口不会调用市场数据或生成报告。</p>
     </dialog>
 
     <dialog id="uploadDfaModal" class="upload-dfa-modal">
       <header>
         <div>
           <span class="pane-kicker">Template-to-DFA Builder</span>
-          <h2>上传模板自动构建写作图</h2>
+          <h2>上传模板自动构建 DFA</h2>
           <p id="uploadDfaSummary">上传多份同类报告或模板，系统将抽取状态、对齐语义并归纳稳定转移。</p>
         </div>
         <button id="closeUploadDfaButton" class="icon-button" type="button" title="关闭" aria-label="关闭模板构建器">×</button>
@@ -430,7 +430,7 @@
             <small>建议上传 2–10 份同领域、同报告类型的样本</small>
           </div>
           <div class="upload-builder-fields">
-            <label><span>写作图名称</span><input id="uploadDfaNameInput" type="text" maxlength="120" placeholder="如：贵金属周报写作图" /></label>
+            <label><span>DFA 名称</span><input id="uploadDfaNameInput" type="text" maxlength="120" placeholder="如：贵金属周报 DFA" /></label>
             <label><span>模板分类</span><input id="uploadDfaCategoryInput" type="text" maxlength="80" list="templateCategorySuggestions" placeholder="如：周报 / 策略报告" /></label>
             <datalist id="templateCategorySuggestions"><option value="周报模板"></option><option value="月报模板"></option><option value="专题报告"></option><option value="策略报告"></option><option value="行业跟踪"></option></datalist>
             <label><span>报告领域</span><select id="uploadDfaDomainSelect"><option value="auto">自动识别</option><option value="precious_metals">贵金属 / 有色</option><option value="etf">ETF</option><option value="macro">宏观</option><option value="cotton">棉花</option><option value="agriculture">农产品</option></select></label>
@@ -446,7 +446,7 @@
           </label>
           <div id="uploadDfaFileList" class="upload-file-list"><div class="upload-file-empty">尚未选择模板文件</div></div>
           <div class="upload-guidance">
-            <strong>怎样获得更稳定的写作图？</strong>
+            <strong>怎样获得更稳定的 DFA？</strong>
             <ul><li>尽量上传同领域、同机构或同报告类型的模板。</li><li>保留章节标题和段落顺序，系统会据此识别写作状态。</li><li>至少两份样本有助于区分稳定结构与偶然段落。</li></ul>
           </div>
           <button id="startUploadDfaBuildButton" class="upload-build-button" type="button">开始构建 DFA</button>
@@ -463,19 +463,19 @@
 
         <section class="upload-library-panel">
           <div class="upload-builder-heading">
-            <div><span>02</span><strong>模板写作图库</strong></div>
-            <small id="uploadDfaLibraryCount">0 个已构建结构</small>
+            <div><span>02</span><strong>模板 DFA 库</strong></div>
+            <small id="uploadDfaLibraryCount">0 个已构建 DFA</small>
           </div>
           <div class="upload-library-toolbar">
             <label><span>领域</span><select id="uploadDfaLibraryDomain"><option value="all">全部领域</option><option value="precious_metals">贵金属 / 有色</option><option value="etf">ETF</option><option value="macro">宏观</option><option value="cotton">棉花</option><option value="agriculture">农产品</option></select></label>
             <label><span>搜索</span><input id="uploadDfaLibrarySearch" type="search" placeholder="名称或分类" /></label>
             <button id="refreshUploadDfaLibraryButton" type="button">刷新</button>
           </div>
-          <div id="uploadDfaLibrary" class="upload-dfa-library"><div class="upload-library-empty">构建完成的写作图会按领域和分类保存在这里。</div></div>
+          <div id="uploadDfaLibrary" class="upload-dfa-library"><div class="upload-library-empty">构建完成的 DFA 会按领域和分类保存在这里。</div></div>
           <section id="uploadDfaPreview" class="upload-dfa-preview" hidden>
-            <header><div><span id="uploadDfaPreviewCategory">模板写作图</span><strong id="uploadDfaPreviewName">未选择结构</strong></div><button id="closeUploadDfaPreviewButton" type="button">收起预览</button></header>
+            <header><div><span id="uploadDfaPreviewCategory">模板 DFA</span><strong id="uploadDfaPreviewName">未选择 DFA</strong></div><button id="closeUploadDfaPreviewButton" type="button">收起预览</button></header>
             <div id="uploadDfaPreviewMetrics" class="upload-preview-metrics"></div>
-            <div class="upload-preview-canvas"><svg id="uploadDfaPreviewSvg" viewBox="0 0 900 440" role="img" aria-label="上传模板构建的写作图"></svg></div>
+            <div class="upload-preview-canvas"><svg id="uploadDfaPreviewSvg" viewBox="0 0 900 440" role="img" aria-label="上传模板构建的 DFA"></svg></div>
             <div id="uploadDfaPreviewFiles" class="upload-preview-files"></div>
           </section>
         </section>
@@ -485,11 +485,11 @@
     <dialog id="myDfaModal" class="my-dfa-modal">
       <header>
         <div>
-          <span class="pane-kicker">User Writing Graph Workspace</span>
-          <h2>我的写作图</h2>
+          <span class="pane-kicker">User DFA Workspace</span>
+          <h2>我的 DFA</h2>
           <p id="myDfaSummary">从系统垂类导入副本，自主调整段落状态与转移结构。</p>
         </div>
-        <button id="closeMyDfaButton" class="icon-button" type="button" title="关闭" aria-label="关闭我的写作图">×</button>
+        <button id="closeMyDfaButton" class="icon-button" type="button" title="关闭" aria-label="关闭我的 DFA">×</button>
       </header>
       <div class="my-dfa-layout">
         <aside class="my-dfa-library">
@@ -502,7 +502,7 @@
               <option value="cotton">棉花</option>
               <option value="agriculture">农产品</option>
             </select>
-            <button id="importMyDfaButton" type="button">导入为我的写作图</button>
+            <button id="importMyDfaButton" type="button">导入为我的 DFA</button>
             <small>导入创建独立副本，不修改系统训练模板。</small>
           </section>
           <section class="my-dfa-saved">
@@ -513,12 +513,12 @@
         <main class="my-dfa-main">
           <div id="myDfaEmpty" class="my-dfa-empty">
             <span>✦</span>
-            <strong>还没有用户写作图</strong>
+            <strong>还没有用户 DFA</strong>
             <p>从左侧选择一个系统垂类导入，即可开始构建自己的段落状态机。</p>
           </div>
           <section id="myDfaEditor" class="my-dfa-editor" hidden>
             <header class="my-dfa-editor-toolbar">
-              <label><span>写作图名称</span><input id="myDfaNameInput" type="text" maxlength="60" /></label>
+              <label><span>DFA 名称</span><input id="myDfaNameInput" type="text" maxlength="60" /></label>
               <div>
                 <button id="addMyDfaNodeButton" type="button">＋ 添加段落</button>
                 <button id="saveMyDfaButton" class="primary" type="button">保存结构</button>
@@ -528,7 +528,7 @@
             <div id="myDfaMetrics" class="my-dfa-metrics"></div>
             <div class="my-dfa-workspace">
               <div class="my-dfa-canvas">
-                <svg id="myDfaSvg" viewBox="0 0 980 560" role="img" aria-label="用户写作图"></svg>
+                <svg id="myDfaSvg" viewBox="0 0 980 560" role="img" aria-label="用户 DFA"></svg>
               </div>
               <aside class="my-dfa-inspector">
                 <section id="myDfaNodeEditor" class="my-dfa-node-editor"></section>
@@ -548,11 +548,11 @@
           </section>
         </main>
       </div>
-      <p class="my-dfa-note">用户写作图保存在当前浏览器本机存储中；系统原始写作图始终保持只读并可重新导入。</p>
+      <p class="my-dfa-note">用户 DFA 保存在当前浏览器本机存储中；系统原始全局写作 DFA 始终保持只读并可重新导入。</p>
     </dialog>
 
-    <script src="./pages-demo.js?v=20260815b"></script>
-    <script src="./i18n.js?v=20260815b"></script>
-    <script src="./app.js?v=20260815b"></script>
+    <script src="./pages-demo.js?v=20260826dfa"></script>
+    <script src="./i18n.js?v=20260826dfa"></script>
+    <script src="./app.js?v=20260826dfa"></script>
   </body>
 </html>

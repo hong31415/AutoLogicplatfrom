@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 from http.server import BaseHTTPRequestHandler, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-BACKEND_BASE = "http://127.0.0.1:8787"
+BACKEND_BASE = os.environ.get("SUBDFA_BACKEND_BASE", "http://127.0.0.1:8787").rstrip("/")
 
 
 class FrontendHandler(SimpleHTTPRequestHandler):
@@ -70,6 +71,8 @@ class FrontendHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = ThreadingHTTPServer(("127.0.0.1", 8790), FrontendHandler)
-    print("AutoLogic frontend + API proxy listening on http://127.0.0.1:8790")
+    host = os.environ.get("SUBDFA_FRONTEND_HOST", "127.0.0.1")
+    port = int(os.environ.get("SUBDFA_FRONTEND_PORT", "8790"))
+    server = ThreadingHTTPServer((host, port), FrontendHandler)
+    print(f"AutoLogic frontend + API proxy listening on http://{host}:{port}; backend={BACKEND_BASE}")
     server.serve_forever()

@@ -203,7 +203,7 @@
       evidence_summary: { total_bindings: sections.length, found_bindings: sections.length, provider: "Built-in Demo Dataset" },
       runtime: {
         domain_key: key, domain: definition.domain, language, artifact_mode: "browser-demo", dfa_source: payload.custom_dfa ? "user" : "system",
-        user_dfa: payload.custom_dfa ? { name: payload.custom_dfa.name || "用户写作图" } : null,
+        user_dfa: payload.custom_dfa ? { name: payload.custom_dfa.name || "用户 DFA" } : null,
         rebuilt: false, fallback_top_k: Number(payload.fallback_top_k || 3),
         induction: { documents: 48, case_files: 24, frequency_threshold: 0.3, sequence_patterns: 6 },
         evidence: { enabled: true, requested: true, used: true, mode: "demo-snapshot", source: "browser", status: "found", providers_used: ["Built-in Demo Dataset"], summary: { total: sections.length, found: sections.length }, providers: { "Built-in Demo Dataset": { status: "found", calls: sections.length, found: sections.length, errors: [] } } }
@@ -247,7 +247,7 @@
     const edges = selectedLabels.map((_label, index) => ({ id: `T${String(index + 1).padStart(3, "0")}`, source: index === 0 ? "S0" : `S${index}`, target: `S${index + 1}`, condition_label: index === 0 ? "用户意图匹配" : "模板稳定顺序", direct: index > 0 }));
     const files = (payload.files || []).map((file) => ({ name: file.name, type: file.type, size: file.size }));
     const quality = { document_count: files.length, state_count: selectedLabels.length, transition_count: edges.length, frequency_threshold: Number(payload.frequency_threshold || 0.3), confidence: files.length >= 3 ? "high" : "medium", file_errors: [] };
-    const graph = { id, name: payload.name || `${definition.domain} · 浏览器模板写作图`, baseDomain: key, category: payload.category || "未分类模板", nodes, edges, files, quality, origin: "browser-template-demo", createdAt: new Date().toISOString() };
+    const graph = { id, name: payload.name || `${definition.domain} · 浏览器模板 DFA`, baseDomain: key, category: payload.category || "未分类模板", nodes, edges, files, quality, origin: "browser-template-demo", createdAt: new Date().toISOString() };
     await dbPut("templateDfas", { id, name: graph.name, domain: key, category: graph.category, graph, files, quality, archived: false });
     const jobId = `browser-job-${Date.now()}`;
     const now = new Date().toLocaleTimeString();

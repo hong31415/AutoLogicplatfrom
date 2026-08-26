@@ -99,7 +99,7 @@ def _save_file_record(
     now = datetime.now().isoformat(timespec="seconds")
     record = {
         "id": str(graph.get("id") or ""),
-        "name": str(graph.get("name") or "上传模板写作图"),
+        "name": str(graph.get("name") or "上传模板 DFA"),
         "domain": str(graph.get("baseDomain") or "macro"),
         "category": str(graph.get("category") or "未分类模板"),
         "origin": "uploaded-template",
@@ -583,7 +583,7 @@ def _run_build(job_id: str, payload: dict[str, Any]) -> None:
         _update_job(job_id, progress=74, stage="inducing", message="正在统计状态频率和相邻转移，归纳稳定结构。")
         graph, quality = _build_graph(
             documents,
-            str(payload.get("name") or "上传模板写作图").strip()[:120] or "上传模板写作图",
+            str(payload.get("name") or "上传模板 DFA").strip()[:120] or "上传模板 DFA",
             domain,
             str(payload.get("category") or "未分类模板").strip()[:80],
             max(0.05, min(0.95, float(payload.get("frequency_threshold") or 0.3))),
@@ -645,7 +645,7 @@ def create_template_dfa_job(payload: dict[str, Any]) -> dict[str, Any]:
             "status": "queued",
             "progress": 2,
             "stage": "queued",
-            "name": str(payload.get("name") or "上传模板写作图")[:120],
+            "name": str(payload.get("name") or "上传模板 DFA")[:120],
             "logs": [{"time": datetime.now().strftime("%H:%M:%S"), "message": "构建任务已创建，等待处理。"}],
             "created_at": now,
             "updated_at": now,

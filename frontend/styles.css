@@ -73,6 +73,54 @@ summary:focus-visible {
   height: 100vh;
 }
 
+/* The embedded recorder has a high-DPI viewport.  This opt-in URL mode keeps
+   the complete two-column workspace inside one uncropped video frame without
+   affecting the normal application. */
+html.capture-mode .app-shell {
+  width: 200vw;
+  height: 200vh;
+  zoom: 0.5;
+}
+
+html.capture-mode .current-turn {
+  padding-bottom: 100vh;
+}
+
+/* A more readable framing for the report/trace portion of the demo.  It
+   preserves both columns while keeping body copy large enough for a 1080p
+   conference video; the recorder moves through long content by scrolling. */
+html.capture-report-mode .app-shell {
+  width: 117.647vw;
+  height: 117.647vh;
+  zoom: 0.85;
+}
+
+html.capture-report-mode .current-turn {
+  width: calc(100% - 56px);
+  max-width: none;
+  padding-bottom: 42vh;
+}
+
+/* Mid-scale framing for real workflow interactions such as changing the DFA
+   source and walking through generation stages. */
+html.capture-workflow-mode .app-shell {
+  width: 138.889vw;
+  height: 138.889vh;
+  zoom: 0.72;
+}
+
+html.capture-workflow-mode .current-turn {
+  padding-bottom: 64vh;
+}
+
+html.capture-workflow-mode .composer-shell {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 248px;
+  z-index: 50;
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;

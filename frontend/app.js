@@ -1,5 +1,12 @@
 // The frontend proxy keeps API calls same-origin, which also makes a single
 // Cpolar HTTP tunnel sufficient for sharing the complete application.
+const CAPTURE_MODE = new URLSearchParams(window.location.search).get("capture");
+const IS_CAPTURE_MODE = CAPTURE_MODE === "1";
+const IS_REPORT_CAPTURE_MODE = CAPTURE_MODE === "report";
+const IS_WORKFLOW_CAPTURE_MODE = CAPTURE_MODE === "workflow";
+if (IS_CAPTURE_MODE) document.documentElement.classList.add("capture-mode");
+if (IS_REPORT_CAPTURE_MODE) document.documentElement.classList.add("capture-report-mode");
+if (IS_WORKFLOW_CAPTURE_MODE) document.documentElement.classList.add("capture-workflow-mode");
 const API_BASE = "/api/v1";
 const STORAGE_KEY = "autologic-history-v2";
 const MY_DFA_STORAGE_KEY = "autologic-user-dfas-v1";
@@ -10,9 +17,9 @@ const NODE_H = 78;
 const IS_ENGLISH = window.AutoLogicI18n?.language === "en";
 const ui = (chinese, english) => IS_ENGLISH ? english : chinese;
 const THRESHOLD_PRESETS = Object.freeze({
-  core: { theta: 0.70, tau: 0.45, topK: 2, summary: "核心 · 只保留关键状态" },
-  balanced: { theta: 0.50, tau: 0.20, topK: 3, summary: "均衡 · 兼顾核心与覆盖" },
-  comprehensive: { theta: 0.30, tau: 0.10, topK: 8, summary: "全面 · 扩大状态覆盖" }
+  core: { theta: 0.70, tau: 0.45, topK: 2, summary: ui("核心 · 只保留关键状态", "Core · Key states only") },
+  balanced: { theta: 0.50, tau: 0.20, topK: 3, summary: ui("均衡 · 兼顾核心与覆盖", "Balanced · Core and coverage") },
+  comprehensive: { theta: 0.30, tau: 0.10, topK: 8, summary: ui("全面 · 扩大状态覆盖", "Comprehensive · Expanded coverage") }
 });
 const INTERNAL_DFA_STAGE_LABELS = Object.freeze({
   entry: ui("入口状态", "Entry State"),
@@ -274,8 +281,8 @@ function updateThresholdPresetUi() {
   });
   els.thresholdPresetSummary.textContent = matched
     ? `${matched[1].summary} · θ ${theta.toFixed(2)} / τ ${tau.toFixed(2)} / Top-${topK}`
-    : `自定义 · θ ${theta.toFixed(2)} / τ ${tau.toFixed(2)} / Top-${topK}`;
-  els.thresholdPresetButtonLabel.textContent = matched ? matched[1].summary.split(" · ")[0] : "自定义";
+    : `${ui("自定义", "Custom")} · θ ${theta.toFixed(2)} / τ ${tau.toFixed(2)} / Top-${topK}`;
+  els.thresholdPresetButtonLabel.textContent = matched ? matched[1].summary.split(" · ")[0] : ui("自定义", "Custom");
   els.thresholdPresetButtonMeta.textContent = `θ ${theta.toFixed(2)} · τ ${tau.toFixed(2)} · Top-${topK}`;
   els.composerTheta.value = String(theta);
   els.composerThetaValue.textContent = theta.toFixed(2);
@@ -332,20 +339,24 @@ function renderComposerDfaOptions() {
   const selected = selectedComposerDfa();
   if (state.uploadedDfasLoaded && state.composerDfaId !== "system" && !selected) state.composerDfaId = "system";
   els.composerDfaSelect.innerHTML = [
-    '<option value="system">系统写作图 · 按垂类自动选择</option>',
-    ...state.myDfas.map((dfa) => `<option value="${escapeHtml(dfa.id)}">手动写作图 · ${escapeHtml(dfa.name || "未命名结构")}</option>`),
-    ...state.uploadedDfas.map((dfa) => `<option value="${escapeHtml(dfa.id)}">上传模板 · ${escapeHtml(dfa.name || "未命名结构")}</option>`)
+    `<option value="system">${ui("系统写作 DFA · 按垂类自动选择", "System Writing DFA · Auto-select by domain")}</option>`,
+    ...state.myDfas.map((dfa) => `<option value="${escapeHtml(dfa.id)}">${ui("自定义 DFA", "Custom DFA")} · ${escapeHtml(dfa.name || ui("未命名结构", "Untitled Structure"))}</option>`),
+    ...state.uploadedDfas.map((dfa) => `<option value="${escapeHtml(dfa.id)}">${ui("上传模板", "Uploaded Template")} · ${escapeHtml(dfa.name || ui("未命名结构", "Untitled Structure"))}</option>`)
   ].join("");
   els.composerDfaSelect.value = state.composerDfaId;
   const active = selectedComposerDfa();
   els.composerDfaSourceControl.classList.toggle("is-custom", Boolean(active));
-  els.composerDfaSourceLabel.textContent = active ? (active.origin === "uploaded-template" ? "模板写作图" : "我的写作图") : "系统写作图";
-  els.composerDfaSourceMeta.textContent = active ? active.name || "自定义结构" : "按垂类自动选择";
+  els.composerDfaSourceLabel.textContent = active
+    ? (active.origin === "uploaded-template" ? ui("模板 DFA", "Template DFA") : ui("我的 DFA", "My DFA"))
+    : ui("系统写作 DFA", "System Writing DFA");
+  els.composerDfaSourceMeta.textContent = active ? active.name || ui("自定义结构", "Custom Structure") : ui("按垂类自动选择", "Auto-select by domain");
   els.composerDfaSourceHint.textContent = active
-    ? `本次将使用“${active.name || "未命名结构"}”的 ${active.nodes?.length || 0} 个状态和 ${active.edges?.length || 0} 条转移构建查询执行图。`
+    ? (IS_ENGLISH
+      ? `This run uses ${active.nodes?.length || 0} states and ${active.edges?.length || 0} transitions from “${active.name || "Untitled Structure"}” to build the Query-Specific Sub-DFA.`
+      : `本次将使用“${active.name || "未命名结构"}”的 ${active.nodes?.length || 0} 个状态和 ${active.edges?.length || 0} 条转移构建 Query-Specific Sub-DFA。`)
     : state.myDfas.length || state.uploadedDfas.length
-      ? "当前使用系统训练得到的全局写作图；也可以切换到手动结构或上传模板归纳的结构。"
-      : "当前使用系统训练得到的全局写作图。可以手动构建，也可以上传模板自动归纳新的写作图。";
+      ? ui("当前使用系统诱导得到的全局写作 DFA；也可以切换到自定义 DFA 或模板诱导 DFA。", "The run uses the system-induced Global Writing DFA; you can also switch to a custom or template-induced DFA.")
+      : ui("当前使用系统诱导得到的全局写作 DFA。可以手动构建，也可以上传模板自动归纳新的 DFA。", "The run uses the system-induced Global Writing DFA. You can build a custom DFA manually or induce one from uploaded templates.");
   localStorage.setItem(COMPOSER_DFA_STORAGE_KEY, state.composerDfaId);
 }
 
@@ -533,7 +544,7 @@ async function showHistoryItem(item) {
   els.pastMessages.innerHTML = `
     <section class="history-loading" aria-live="polite">
       <img class="history-loading-mark" src="./assets/autologic-studio-mark-light.png?v=20260802a" alt="" aria-hidden="true" />
-      <div><strong>正在恢复历史任务</strong><p>加载查询执行图、执行轨迹、数据证据和完整报告</p></div>
+      <div><strong>正在恢复历史任务</strong><p>加载 Query-Specific Sub-DFA、执行轨迹、数据证据和完整报告</p></div>
     </section>
   `;
   renderHistory();
@@ -668,7 +679,7 @@ function uploadedDfaFromItem(item) {
   const graph = cloneJson(item?.graph || item || {});
   graph.id = String(graph.id || item?.id || "");
   graph.serverId = String(item?.id || graph.serverId || graph.id);
-  graph.name = String(graph.name || item?.name || "上传模板写作图");
+  graph.name = String(graph.name || item?.name || "上传模板 DFA");
   graph.baseDomain = String(graph.baseDomain || item?.domain || "macro");
   graph.category = String(graph.category || item?.category || "未分类模板");
   graph.origin = "uploaded-template";
@@ -696,9 +707,9 @@ function renderUploadedDfaLibrary() {
     (domain === "all" || dfa.baseDomain === domain)
     && (!search || `${dfa.name} ${dfa.category}`.toLowerCase().includes(search))
   ));
-  els.uploadDfaLibraryCount.textContent = `${state.uploadedDfas.length} 个已构建结构`;
+  els.uploadDfaLibraryCount.textContent = `${state.uploadedDfas.length} 个已构建 DFA`;
   if (!items.length) {
-    els.uploadDfaLibrary.innerHTML = '<div class="upload-library-empty">没有符合当前筛选条件的模板写作图。</div>';
+    els.uploadDfaLibrary.innerHTML = '<div class="upload-library-empty">没有符合当前筛选条件的模板 DFA。</div>';
     return;
   }
   const groups = new Map();
@@ -883,7 +894,7 @@ async function startUploadDfaBuild() {
       files.push({name: file.name, type: file.type, size: file.size, content_base64: await fileToBase64(file)});
     }
     const job = await apiPost("/template-dfa-jobs", {
-      name: els.uploadDfaName.value.trim() || `${DFA_DOMAIN_LABELS[els.uploadDfaDomain.value] || "自动识别"} · 上传模板写作图`,
+      name: els.uploadDfaName.value.trim() || `${DFA_DOMAIN_LABELS[els.uploadDfaDomain.value] || "自动识别"} · 上传模板 DFA`,
       category: els.uploadDfaCategory.value.trim() || "未分类模板",
       domain: els.uploadDfaDomain.value,
       frequency_threshold: Number(els.uploadDfaTheta.value || 0.3),
@@ -1129,9 +1140,9 @@ function startPendingClock() {
   state.pendingStartedAt = Date.now();
   const customDfa = selectedComposerDfa();
   const phases = [
-    customDfa ? `载入我的写作图 · ${customDfa.name || "自定义结构"}` : "载入系统全局写作图",
+    customDfa ? `载入我的 DFA · ${customDfa.name || "自定义结构"}` : "载入系统全局写作 DFA",
     "解析对话并匹配语义状态",
-    "构建本次查询执行图",
+    "构建本次 Query-Specific Sub-DFA",
     "等待模型返回状态片段"
   ];
   let phaseIndex = 0;
@@ -1203,13 +1214,13 @@ function beginRun(query) {
   updateComposerMode();
   els.runTitle.textContent = "正在启动 AutoLogic";
   const customDfa = selectedComposerDfa();
-  els.runSubtitle.textContent = customDfa ? `载入我的写作图 · ${customDfa.name || "自定义结构"}` : "载入系统全局写作图";
+  els.runSubtitle.textContent = customDfa ? `载入我的 DFA · ${customDfa.name || "自定义结构"}` : "载入系统全局写作 DFA";
   els.runBadge.textContent = "运行中";
   els.runBadge.className = "run-badge running";
   els.skipAnimation.disabled = true;
   renderPending();
   startPendingClock();
-  scrollToBottom(false);
+  scrollRunToTop(false);
 }
 
 function renderPending() {
@@ -1221,11 +1232,11 @@ function renderPending() {
   els.traceCounter.textContent = "0 / 0";
   els.decisionIndex.textContent = "S0";
   els.decisionContextLabel.textContent = "当前构建对象";
-  els.decisionTitle.textContent = "初始化全局写作图";
+  els.decisionTitle.textContent = "初始化全局写作 DFA";
   els.evidenceLabel.textContent = "构建依据";
   els.evidenceText.textContent = "等待解析用户对话";
   els.conditionLabel.textContent = "当前产出";
-  els.conditionText.textContent = "等待构建本次查询执行图";
+  els.conditionText.textContent = "等待构建本次 Query-Specific Sub-DFA";
   els.eventTimeline.innerHTML = "";
   els.runDetailGrid.innerHTML = "";
   drawGraph();
@@ -1264,7 +1275,7 @@ function materialSummary(nodeId) {
     "当前阶段展示",
     "State source:",
     "Required materials:",
-    "writing-graph state-level",
+    "writing-DFA state-level",
     "iFinD enabled but no binding"
   ];
   const usefulFacts = facts.filter((fact) => !internalMarkers.some((marker) => String(fact).includes(marker)));
@@ -1485,7 +1496,7 @@ function buildExecutionEvents(analysis) {
   const routeEdges = analysis.subdfa?.edge_ids || [];
   const removedAlternatives = Math.max(0, rawEdges.length - routeEdges.length);
   const usingUserDfa = analysis.runtime?.dfa_source === "user";
-  const userDfaName = analysis.runtime?.user_dfa?.name || "我的写作图";
+  const userDfaName = analysis.runtime?.user_dfa?.name || "我的 DFA";
   const constraintSummary = [
     analysis.constraints?.domain,
     analysis.constraints?.date,
@@ -1496,7 +1507,7 @@ function buildExecutionEvents(analysis) {
       stage: "dfa",
       type: "dfa",
       graphScope: "full",
-      title: usingUserDfa ? "读取我的写作图" : "读取系统全局写作图",
+      title: usingUserDfa ? "读取我的 DFA" : "读取系统全局写作 DFA",
       subtitle: usingUserDfa
         ? `使用“${userDfaName}”的 ${nodes.length} 个状态与 ${edges.length} 条自定义转移`
         : `复用 ${nodes.length} 个状态与 ${edges.length} 条稳定转移，本次不重新学习`,
@@ -1539,7 +1550,7 @@ function buildExecutionEvents(analysis) {
       type: "raw",
       graphScope: "raw",
       title: "合并候选状态路径",
-      subtitle: `从初始状态到命中状态形成 ${rawNodes.length} 个状态、${rawEdges.length} 条条件转移的候选子图`,
+      subtitle: `从初始状态到命中状态形成 ${rawNodes.length} 个状态、${rawEdges.length} 条条件转移的候选 Sub-DFA`,
       activeNodes: rawNodes,
       activeEdges: rawEdges,
       generatedUntil: 0
@@ -1551,7 +1562,7 @@ function buildExecutionEvents(analysis) {
       title: "应用条件约束选择路径",
       subtitle: removedAlternatives
         ? `依据当前对话、历史频率和条件优先级排除 ${removedAlternatives} 条分支`
-        : "候选子图已经是一条确定性的可执行路径",
+        : "候选 Sub-DFA 已经是一条确定性的可执行路径",
       activeNodes: routeNodes,
       activeEdges: routeEdges,
       generatedUntil: 0
@@ -1560,7 +1571,7 @@ function buildExecutionEvents(analysis) {
       stage: "subdfa",
       type: "finalized",
       graphScope: "subdfa",
-      title: "本次查询执行图构建完成",
+      title: "Query-Specific Sub-DFA 构建完成",
       subtitle: `${routeNodes.length} 个状态 · ${routeEdges.length} 条转移 · ${order.length} 个可执行写作状态`,
       activeNodes: routeNodes,
       activeEdges: routeEdges,
@@ -1697,7 +1708,11 @@ function renderCurrentEvent() {
   els.runBadge.textContent = finalEvent ? evidenceBindingStatusLabel(state.analysis) : reviewing ? "回看" : "执行中";
   els.runBadge.className = `run-badge ${blocked ? "error" : finalEvent ? "complete" : reviewing ? "" : "running"}`;
   els.traceCounter.textContent = `${state.eventIndex + 1} / ${state.events.length}`;
-  els.skipAnimation.disabled = finalEvent;
+  // Construction can be fast, but the final report may still be waiting on
+  // the model.  Keep Skip to Result locked until report data is actually
+  // available; otherwise an early click cancels playback and leaves the run
+  // permanently stuck in a Running state.
+  els.skipAnimation.disabled = finalEvent || (state.busy && !state.reportReady);
   renderStageRail(event.stage, completedStages());
   renderReport();
   renderDecision();
@@ -1802,7 +1817,7 @@ function constructionStepDetail(analysis, event) {
   if (event.type === "dfa") {
     return {
       metric: `${analysis.template?.nodes?.length || 0} 个状态 · ${analysis.template?.edges?.length || 0} 条转移`,
-      chips: [analysis.runtime?.dfa_source === "user" ? analysis.runtime?.user_dfa?.name || "我的写作图" : "系统全局写作图"]
+      chips: [analysis.runtime?.dfa_source === "user" ? analysis.runtime?.user_dfa?.name || "我的 DFA" : "系统全局写作 DFA"]
     };
   }
   if (event.type === "query") {
@@ -1839,19 +1854,19 @@ function renderSubDfaConstruction(analysis, event) {
   const detail = constructionStepDetail(analysis, event);
   const ready = event.type === "finalized";
   els.primaryKicker.textContent = "Query-Specific Execution";
-  els.primaryTitle.textContent = ready ? "本次查询执行图已构建完成" : "查询执行图构建过程";
+  els.primaryTitle.textContent = ready ? "Query-Specific Sub-DFA 已构建完成" : "Query-Specific Sub-DFA 构建过程";
   els.copyReport.hidden = true;
   els.downloadReport.hidden = true;
   els.reportProgress.textContent = `步骤 ${currentIndex + 1} / ${constructionEvents.length}`;
   els.reportMeta.innerHTML = [
-    analysis.runtime?.dfa_source === "user" ? `我的写作图 · ${analysis.runtime?.user_dfa?.name || "自定义结构"}` : "系统全局写作图",
+    analysis.runtime?.dfa_source === "user" ? `我的 DFA · ${analysis.runtime?.user_dfa?.name || "自定义结构"}` : "系统全局写作 DFA",
     `τ ${Number(analysis.tau || 0).toFixed(2)}`,
     `Top-${Number(analysis.runtime?.fallback_top_k || 0)}`
   ].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
   els.reportPreview.className = "report-preview construction-preview";
   els.reportPreview.innerHTML = `
     <section class="subdfa-construction${ready ? " is-ready" : ""}">
-      <div class="construction-stepper" aria-label="查询执行图构建步骤">
+      <div class="construction-stepper" aria-label="Query-Specific Sub-DFA 构建步骤">
         ${constructionEvents.map((item, index) => `
           <article class="${index < currentIndex ? "done" : index === currentIndex ? "active" : "pending"}">
             <span>${index < currentIndex ? "✓" : String(index + 1).padStart(2, "0")}</span>
@@ -1860,7 +1875,7 @@ function renderSubDfaConstruction(analysis, event) {
         `).join("")}
       </div>
       <div class="construction-focus">
-        <header><span>${ready ? "EXECUTION GRAPH READY" : "CURRENT STEP"}</span><strong>${escapeHtml(event.title)}</strong></header>
+        <header><span>${ready ? "SUB-DFA READY" : "CURRENT STEP"}</span><strong>${escapeHtml(event.title)}</strong></header>
         <p>${escapeHtml(event.subtitle || "")}</p>
         <div class="construction-metric">${escapeHtml(detail.metric)}</div>
         <div class="construction-chips">${detail.chips.length ? detail.chips.map((item) => `<span>${escapeHtml(item)}</span>`).join("") : "<span>等待状态输出</span>"}</div>
@@ -1877,12 +1892,12 @@ function renderArticleAssembly(analysis, event) {
   els.copyReport.hidden = true;
   els.downloadReport.hidden = true;
   els.reportProgress.textContent = `${completed} / ${sections.length} 个状态片段`;
-  els.reportMeta.innerHTML = [analysis.domain, analysis.date, "查询执行图已锁定", evidenceSourceLabel(analysis)]
+  els.reportMeta.innerHTML = [analysis.domain, analysis.date, "Query-Specific Sub-DFA 已锁定", evidenceSourceLabel(analysis)]
     .filter(Boolean).map((item) => `<span>${escapeHtml(item)}</span>`).join("");
   els.reportPreview.className = "report-preview assembly-preview";
   els.reportPreview.innerHTML = `
     <section class="article-assembly-process">
-      <header><span>COMPOSE FROM EXECUTION GRAPH</span><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.subtitle || "")}</p></header>
+      <header><span>COMPOSE FROM SUB-DFA</span><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.subtitle || "")}</p></header>
       <div>
         ${sections.map((section, index) => {
           const done = index < completed;
@@ -1928,7 +1943,7 @@ function renderReport() {
 
   if (generatedUntil === 0) {
     els.reportPreview.className = "report-preview";
-    els.reportPreview.innerHTML = '<div class="report-empty">查询执行图已就绪，正在准备报告状态片段。</div>';
+    els.reportPreview.innerHTML = '<div class="report-empty">Query-Specific Sub-DFA 已就绪，正在准备报告状态片段。</div>';
     return;
   }
 
@@ -1994,6 +2009,8 @@ function downloadReport() {
   const slug = String(state.analysis?.domain || "report").replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]+/g, "-");
   const date = state.analysis?.date || new Date().toISOString().slice(0, 10);
   downloadMarkdown(markdown, `${slug}-${date}.md`);
+  els.reportProgress.textContent = state.language === "en" ? "Downloaded" : "已下载";
+  window.setTimeout(() => renderReport(), 1200);
 }
 
 function revisionMarkdown(revision) {
@@ -2084,7 +2101,7 @@ function userDfaFromTemplate(template, domain) {
   const now = new Date().toISOString();
   return {
     id: `user-dfa-${Date.now()}`,
-    name: `${DFA_DOMAIN_LABELS[domain] || domain} · 我的写作图`,
+    name: `${DFA_DOMAIN_LABELS[domain] || domain} · 我的 DFA`,
     baseDomain: domain,
     createdAt: now,
     updatedAt: now,
@@ -2122,7 +2139,7 @@ function renderMyDfaLibrary() {
   els.myDfaCount.textContent = String(state.myDfas.length);
   els.myDfaList.innerHTML = state.myDfas.length ? state.myDfas.map((dfa) => `
     <button type="button" data-my-dfa-id="${escapeHtml(dfa.id)}" class="${dfa.id === state.activeMyDfaId ? "active" : ""}">
-      <strong>${escapeHtml(dfa.name || "未命名写作图")}</strong>
+      <strong>${escapeHtml(dfa.name || "未命名 DFA")}</strong>
       <span>${escapeHtml(DFA_DOMAIN_LABELS[dfa.baseDomain] || dfa.baseDomain || "自定义")} · ${(dfa.nodes || []).length} 状态 · ${(dfa.edges || []).length} 转移</span>
     </button>
   `).join("") : '<div class="my-dfa-list-empty">尚未导入垂类结构</div>';
@@ -2297,7 +2314,7 @@ async function importMyDfaDomain() {
   els.myDfaSummary.textContent = `正在读取${DFA_DOMAIN_LABELS[domain] || domain}系统模板。`;
   try {
     const preview = await apiPost("/pipeline/preview", {
-      query: "用户写作图工作区垂类模板导入",
+      query: "用户 DFA 工作区垂类模板导入",
       domain,
       data_source: "none",
       use_ai: false,
@@ -2313,14 +2330,14 @@ async function importMyDfaDomain() {
     els.myDfaSummary.textContent = `导入失败：${error.message}`;
   } finally {
     els.importMyDfa.disabled = false;
-    els.importMyDfa.textContent = "导入为我的写作图";
+    els.importMyDfa.textContent = "导入为我的 DFA";
   }
 }
 
 function saveMyDfaDraft() {
   const draft = state.myDfaDraft;
   if (!draft) return;
-  draft.name = els.myDfaName.value.trim() || `${DFA_DOMAIN_LABELS[draft.baseDomain] || draft.baseDomain} · 我的写作图`;
+  draft.name = els.myDfaName.value.trim() || `${DFA_DOMAIN_LABELS[draft.baseDomain] || draft.baseDomain} · 我的 DFA`;
   draft.updatedAt = new Date().toISOString();
   const index = state.myDfas.findIndex((dfa) => dfa.id === draft.id);
   if (index >= 0) state.myDfas[index] = cloneJson(draft);
@@ -2433,7 +2450,7 @@ function openMyDfaStudio() {
 }
 
 function closeMyDfaStudio() {
-  if (state.myDfaDirty && !window.confirm("当前写作图有未保存修改，确定放弃并关闭吗？")) return;
+  if (state.myDfaDirty && !window.confirm("当前 DFA 有未保存修改，确定放弃并关闭吗？")) return;
   if (state.activeMyDfaId) {
     const saved = state.myDfas.find((dfa) => dfa.id === state.activeMyDfaId);
     state.myDfaDraft = saved ? cloneJson(saved) : null;
@@ -2663,7 +2680,7 @@ function drawOfflineDfa(template) {
   svg.setAttribute("viewBox", `0 0 ${graphWidth} ${graphHeight}`);
   svg.innerHTML = "";
   if (!nodes.length) {
-    svg.innerHTML = `<text x="${graphWidth / 2}" y="${graphHeight / 2}" text-anchor="middle" class="offline-empty">${ui("本地尚未找到该领域的写作图缓存", "No local writing-graph cache was found for this domain.")}</text>`;
+    svg.innerHTML = `<text x="${graphWidth / 2}" y="${graphHeight / 2}" text-anchor="middle" class="offline-empty">${ui("本地尚未找到该领域的全局写作 DFA 缓存", "No local Global Writing DFA cache was found for this domain.")}</text>`;
     applyOfflineDfaView();
     renderOfflineDfaDetail(null, null);
     return;
@@ -2809,7 +2826,7 @@ async function openOfflineDfa() {
   els.refreshOfflineDfa.disabled = true;
   try {
     const preview = await apiPost("/pipeline/preview", {
-      query: ui("离线全局写作图结构查看", "Inspect the offline global writing graph"),
+      query: ui("离线全局写作 DFA 结构查看", "Inspect the offline Global Writing DFA"),
       domain: els.offlineDfaDomain.value,
       language: state.language,
       data_source: "none",
@@ -2842,7 +2859,7 @@ async function openOfflineDfa() {
   } catch (error) {
     state.offlineDfaTemplate = null;
     state.offlineDfaSelectedNodeId = null;
-    els.offlineDfaSummary.textContent = ui(`无法读取离线写作图：${error.message}`, `Unable to load the offline writing graph: ${error.message}`);
+    els.offlineDfaSummary.textContent = ui(`无法读取离线全局写作 DFA：${error.message}`, `Unable to load the offline Global Writing DFA: ${error.message}`);
     els.offlineDfaMetrics.innerHTML = "";
     drawOfflineDfa(null);
   } finally {
@@ -2867,10 +2884,10 @@ function renderDecision() {
   els.conditionLabel.textContent = evidenceStage ? "数据处理" : assemblyStage ? "报告产出" : "当前产出";
 
   if (event.type === "dfa") {
-    els.decisionIndex.textContent = "GRAPH";
-    els.decisionTitle.textContent = "离线全局写作图";
+    els.decisionIndex.textContent = "DFA";
+    els.decisionTitle.textContent = "离线全局写作 DFA";
     els.evidenceText.textContent = `${nodes.length} 个语义状态，${analysis.template?.edges?.length || 0} 条稳定转移`;
-    els.conditionText.textContent = analysis.runtime?.rebuilt ? "全局写作图本次已重建" : "直接复用已构建的写作图缓存";
+    els.conditionText.textContent = analysis.runtime?.rebuilt ? "全局写作 DFA 本次已重建" : "直接复用已构建的全局写作 DFA 缓存";
   } else if (event.type === "query") {
     els.decisionIndex.textContent = "Q";
     els.decisionTitle.textContent = "当前对话约束";
@@ -2889,19 +2906,19 @@ function renderDecision() {
     els.conditionText.textContent = labelsFor(event.activeNodes);
   } else if (event.type === "raw") {
     els.decisionIndex.textContent = "G′";
-    els.decisionTitle.textContent = "原始 Query 子图";
+    els.decisionTitle.textContent = "候选 Query-Specific Sub-DFA";
     els.evidenceText.textContent = labelsFor(event.activeNodes);
-    els.conditionText.textContent = `从公共祖先 ${analysis.subtree_root || "root"} 抽取相关路径`;
+    els.conditionText.textContent = `从 Global Writing DFA 的公共祖先 ${analysis.subtree_root || "root"} 抽取相关路径`;
   } else if (event.type === "closure") {
     const raw = new Set(analysis.raw_subdfa?.node_ids || []);
     const added = (event.activeNodes || []).filter((id) => !raw.has(id));
     els.decisionIndex.textContent = "δ";
     els.decisionTitle.textContent = "路径与转移闭包";
-    els.evidenceText.textContent = added.length ? `补入连接状态：${labelsFor(added)}` : "原始子图已经连通";
+    els.evidenceText.textContent = added.length ? `补入连接状态：${labelsFor(added)}` : "候选 Sub-DFA 已经连通";
     els.conditionText.textContent = `保留 ${event.activeNodes?.length || 0} 个状态和 ${event.activeEdges?.length || 0} 条可执行转移`;
   } else if (event.type === "finalized") {
     els.decisionIndex.textContent = "Sub";
-    els.decisionTitle.textContent = "本次查询执行图";
+    els.decisionTitle.textContent = "本次 Query-Specific Sub-DFA";
     els.evidenceText.textContent = `${event.activeNodes?.length || 0} 个状态 · ${event.activeEdges?.length || 0} 条转移`;
     els.conditionText.textContent = `执行顺序：${labelsFor(analysis.execution_order)}`;
   } else if (event.type === "assembly") {
@@ -2929,7 +2946,7 @@ function renderDecision() {
 }
 
 function timelineStageCode(stage) {
-  return ({ dfa: "GRAPH", query: "PARSE", match: "MATCH", subdfa: "QUERY GRAPH", evidence: "SOURCE", assembly: "COMPOSE" })[stage] || stage;
+  return ({ dfa: "DFA", query: "PARSE", match: "MATCH", subdfa: "SUB-DFA", evidence: "SOURCE", assembly: "COMPOSE" })[stage] || stage;
 }
 
 function renderTimeline() {
@@ -2958,18 +2975,18 @@ function renderRuntimeDetail() {
   if (!analysis) return;
   const runtime = analysis.runtime || {};
   const dfaSource = runtime.dfa_source === "user"
-    ? `我的写作图 · ${runtime.user_dfa?.name || "自定义结构"}`
-    : `系统写作图 · ${runtime.artifact_mode || "cache"}${runtime.rebuilt ? " · 本次重建" : " · 已复用"}`;
+    ? `我的 DFA · ${runtime.user_dfa?.name || "自定义结构"}`
+    : `系统写作 DFA · ${runtime.artifact_mode || "cache"}${runtime.rebuilt ? " · 本次重建" : " · 已复用"}`;
   const items = [
     ["写作领域", analysis.domain || "自动识别"],
-    ["写作图来源", dfaSource],
+    ["DFA 来源", dfaSource],
     ["语义表示", runtime.embedding?.mode === "semantic-api" ? runtime.embedding?.model || "Semantic API" : "Local hash"],
     ["证据来源", evidenceSourceLabel(analysis)]
   ];
   els.runDetailGrid.innerHTML = items.map(([label, value]) => `
     <div class="detail-item"><span>${escapeHtml(label)}</span><strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong></div>
   `).join("");
-  els.dfaRuntime.textContent = runtime.dfa_source === "user" ? "我的写作图" : (runtime.rebuilt ? "本次重建" : "复用缓存");
+  els.dfaRuntime.textContent = runtime.dfa_source === "user" ? "我的 DFA" : (runtime.rebuilt ? "本次重建" : "复用缓存");
   els.evidenceRuntime.textContent = evidenceSourceLabel(analysis);
   els.modelRuntime.textContent = state.response?.model || state.health?.model || "Fallback";
 }
@@ -3119,13 +3136,13 @@ function drawGraph() {
     els.svg.setAttribute("viewBox", "0 0 720 420");
     els.svg.style.width = "100%";
     els.svg.style.height = "100%";
-    els.graphSummary.textContent = "等待查询执行图构建";
+    els.graphSummary.textContent = "等待 Query-Specific Sub-DFA 构建";
     const text = makeSvg("text");
     text.setAttribute("x", "360");
     text.setAttribute("y", "210");
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("class", "graph-placeholder");
-    text.textContent = "等待条件标注写作图";
+    text.textContent = "等待标注 DFA 转移条件";
     els.svg.appendChild(text);
     return;
   }
@@ -3156,7 +3173,7 @@ function drawGraph() {
   const generatedUntil = event.generatedUntil || 0;
   const visited = new Set((state.analysis.execution_order || []).slice(0, generatedUntil));
   const activeLabel = activeNodes.size <= 2 ? renderNodes.find((node) => activeNodes.has(node.id))?.label : "";
-  els.graphSummary.textContent = `${showFullGraph ? "全局写作图" : "当前执行图"} · ${renderNodes.length} 个状态 · ${renderEdges.length} 条转移${activeLabel ? ` · 当前：${activeLabel}` : ""}`;
+  els.graphSummary.textContent = `${showFullGraph ? "全局写作 DFA" : "当前 Sub-DFA"} · ${renderNodes.length} 个状态 · ${renderEdges.length} 条转移${activeLabel ? ` · 当前：${activeLabel}` : ""}`;
 
   const defs = makeSvg("defs");
   defs.innerHTML = `
@@ -3458,6 +3475,17 @@ function scrollToBottom(smooth = true) {
   });
 }
 
+function scrollRunToTop(smooth = true) {
+  window.requestAnimationFrame(() => {
+    const conversationBox = els.conversation.getBoundingClientRect();
+    const turnBox = els.currentTurn.getBoundingClientRect();
+    els.conversation.scrollTo({
+      top: Math.max(0, els.conversation.scrollTop + turnBox.top - conversationBox.top - 12),
+      behavior: smooth ? "smooth" : "auto"
+    });
+  });
+}
+
 function setGraphView(view) {
   state.graphView = view === "dfa" ? "dfa" : "construction";
   document.querySelectorAll(".graph-toolbar [data-view]").forEach((item) => {
@@ -3471,7 +3499,7 @@ function setGraphExpanded(expanded) {
   els.executionPane.classList.toggle("graph-expanded", state.graphExpanded);
   document.body.classList.toggle("graph-overlay-open", state.graphExpanded);
   els.graphExpand.textContent = state.graphExpanded ? "×" : "⛶";
-  els.graphExpand.title = state.graphExpanded ? "退出放大查看" : "放大查看查询执行图";
+  els.graphExpand.title = state.graphExpanded ? "退出放大查看" : "放大查看 Query-Specific Sub-DFA";
   els.graphExpand.setAttribute("aria-label", els.graphExpand.title);
   if (state.analysis) window.requestAnimationFrame(drawGraph);
 }

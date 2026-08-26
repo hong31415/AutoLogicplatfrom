@@ -268,17 +268,17 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
     raw_nodes = custom_dfa.get("nodes", [])
     raw_edges = custom_dfa.get("edges", [])
     if not isinstance(raw_nodes, list) or not 2 <= len(raw_nodes) <= 80:
-        raise ValueError("用户写作图必须包含 2 至 80 个状态。")
+        raise ValueError("用户 DFA 必须包含 2 至 80 个状态。")
     if not isinstance(raw_edges, list) or len(raw_edges) > 500:
-        raise ValueError("用户写作图的状态转移不能超过 500 条。")
+        raise ValueError("用户 DFA 的状态转移不能超过 500 条。")
 
     node_ids: list[str] = []
     for raw_node in raw_nodes:
         if not isinstance(raw_node, dict):
-            raise ValueError("用户写作图节点格式无效。")
+            raise ValueError("用户 DFA 节点格式无效。")
         node_id = _custom_dfa_text(raw_node.get("id"), 64)
         if not node_id or node_id in node_ids:
-            raise ValueError("用户写作图节点 ID 不能为空且不能重复。")
+            raise ValueError("用户 DFA 节点 ID 不能为空且不能重复。")
         node_ids.append(node_id)
 
     root_candidates = [
@@ -286,7 +286,7 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
         if str(raw_node.get("type", "")).lower() == "root" or int(raw_node.get("level") or 0) == 0
     ]
     if not root_candidates:
-        raise ValueError("用户写作图缺少入口状态。")
+        raise ValueError("用户 DFA 缺少入口状态。")
     root_id = _custom_dfa_text(root_candidates[0].get("id"), 64)
     node_id_set = set(node_ids)
     nodes: list[dict[str, Any]] = []
@@ -378,18 +378,18 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
         transition_function.append({"source": source, "condition": symbol, "target": target})
 
     if not transitions:
-        raise ValueError("用户写作图至少需要一条有效状态转移。")
+        raise ValueError("用户 DFA 至少需要一条有效状态转移。")
     outgoing = {edge["source"] for edge in transitions}
     final_states = [node_id for node_id in node_ids if node_id not in outgoing and node_id != root_id]
     if not final_states:
         final_states = [node_ids[-1]]
-    name = _custom_dfa_text(custom_dfa.get("name") or "我的写作图", 160)
+    name = _custom_dfa_text(custom_dfa.get("name") or "我的 DFA", 160)
     return {
         "template_id": f"user_{domain_key}_{hashlib.sha256(name.encode('utf-8')).hexdigest()[:12]}",
         "language": "zh",
-        "template_description": f"{name} · 用户自定义写作图",
+        "template_description": f"{name} · 用户自定义 DFA",
         "structure_pattern": {
-            "reasoning_logic": "按用户自定义的段落状态、材料规则和状态转移动态构建查询执行图。",
+            "reasoning_logic": "按用户自定义的段落状态、材料规则和状态转移动态构建 Query-Specific Sub-DFA。",
             "node_types": ["root", "leaf"],
             "transitions": transitions,
         },
@@ -405,7 +405,7 @@ def build_user_dfa_template(custom_dfa: dict[str, Any], domain_key: str, spec: d
             "deterministic": True,
         },
         "usage_instruction": {
-            "offline": "用户在“我的写作图”中编辑并保存结构。",
+            "offline": "用户在“我的 DFA”中编辑并保存结构。",
             "online": "对当前问题匹配用户状态，并按用户转移构建确定性执行顺序。",
         },
         "logicrag_metadata": {
@@ -441,7 +441,7 @@ def ensure_user_dfa_artifacts(
                 "artifact_mode": "user-custom",
                 "domain_key": domain_key,
                 "user_dfa_id": _custom_dfa_text(custom_dfa.get("id"), 160),
-                "user_dfa_name": _custom_dfa_text(custom_dfa.get("name") or "我的写作图", 160),
+                "user_dfa_name": _custom_dfa_text(custom_dfa.get("name") or "我的 DFA", 160),
                 "content_hash": digest,
                 "outputs": {"global_template": str(template_path), "state_index": str(index_path)},
             },
@@ -482,10 +482,42 @@ def extract_date(query: str, today: date_type | None = None) -> str:
     The original range remains in the query for the report-generation prompt.
     """
     anchor = today or date_type.today()
+    english_months = {
+        "january": 1,
+        "february": 2,
+        "march": 3,
+        "april": 4,
+        "may": 5,
+        "june": 6,
+        "july": 7,
+        "august": 8,
+        "september": 9,
+        "october": 10,
+        "november": 11,
+        "december": 12,
+        "jan": 1,
+        "feb": 2,
+        "mar": 3,
+        "apr": 4,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+        "sep": 9,
+        "sept": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12,
+    }
+
+    def month_end(year: int, month: int) -> str:
+        if not 1 <= month <= 12:
+            return ""
+        next_month = date_type(year + (month == 12), month % 12 + 1, 1)
+        return (next_month - timedelta(days=1)).isoformat()
 
     numeric_range = re.search(
         r"(?P<sy>20\d{2})[-/.](?P<sm>\d{1,2})[-/.](?P<sd>\d{1,2})\s*"
-        r"(?:至|到|—|–|~|～|-)\s*"
+        r"(?:至|到|to|through|—|–|~|～|-)\s*"
         r"(?:(?P<ey>20\d{2})[-/.])?(?P<em>\d{1,2})[-/.](?P<ed>\d{1,2})",
         query,
     )
@@ -517,6 +549,22 @@ def extract_date(query: str, today: date_type | None = None) -> str:
         if value:
             return value
 
+    english_written_range = re.search(
+        r"\b(?P<month>January|February|March|April|May|June|July|August|September|October|November|December|"
+        r"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+"
+        r"(?P<start_day>\d{1,2})\s*(?:to|through|—|–|~|-)\s*(?P<end_day>\d{1,2}),?\s*(?P<year>20\d{2})\b",
+        query,
+        flags=re.I,
+    )
+    if english_written_range:
+        value = _valid_iso_date(
+            int(english_written_range.group("year")),
+            english_months[english_written_range.group("month").lower()],
+            int(english_written_range.group("end_day")),
+        )
+        if value:
+            return value
+
     iso_matches = re.findall(r"\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b", query)
     for year, month, day in reversed(iso_matches):
         value = _valid_iso_date(int(year), int(month), int(day))
@@ -530,33 +578,24 @@ def extract_date(query: str, today: date_type | None = None) -> str:
             return value
 
     english_matches = re.findall(
-        r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s*(20\d{2})",
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December|"
+        r"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(\d{1,2}),\s*(20\d{2})\b",
         query,
         flags=re.I,
     )
-    months = {
-        "january": 1,
-        "february": 2,
-        "march": 3,
-        "april": 4,
-        "may": 5,
-        "june": 6,
-        "july": 7,
-        "august": 8,
-        "september": 9,
-        "october": 10,
-        "november": 11,
-        "december": 12,
-    }
     for month_name, day, year in reversed(english_matches):
-        value = _valid_iso_date(int(year), months[month_name.lower()], int(day))
+        value = _valid_iso_date(int(year), english_months[month_name.lower()], int(day))
         if value:
             return value
 
-    quarter_match = re.search(r"\b(20\d{2})\s*[-/]?\s*[Qq]([1-4])\b", query)
+    quarter_match = re.search(
+        r"\b(?:(?P<year_first>20\d{2})\s*[-/]?\s*[Qq](?P<quarter_after>[1-4])|"
+        r"[Qq](?P<quarter_first>[1-4])\s*[-/]?\s*(?P<year_after>20\d{2}))\b",
+        query,
+    )
     if quarter_match:
-        year = int(quarter_match.group(1))
-        quarter = int(quarter_match.group(2))
+        year = int(quarter_match.group("year_first") or quarter_match.group("year_after"))
+        quarter = int(quarter_match.group("quarter_after") or quarter_match.group("quarter_first"))
         quarter_end_month = quarter * 3
         next_month = date_type(year + (quarter_end_month == 12), quarter_end_month % 12 + 1, 1)
         return (next_month - timedelta(days=1)).isoformat()
@@ -575,17 +614,29 @@ def extract_date(query: str, today: date_type | None = None) -> str:
     if numeric_month_match:
         year = int(numeric_month_match.group(1))
         month = int(numeric_month_match.group(2))
-        if 1 <= month <= 12:
-            next_month = date_type(year + (month == 12), month % 12 + 1, 1)
-            return (next_month - timedelta(days=1)).isoformat()
+        value = month_end(year, month)
+        if value:
+            return value
 
     chinese_month_match = re.search(r"(20\d{2})\s*年\s*(\d{1,2})\s*月(?!\s*\d)", query)
     if chinese_month_match:
         year = int(chinese_month_match.group(1))
         month = int(chinese_month_match.group(2))
-        if 1 <= month <= 12:
-            next_month = date_type(year + (month == 12), month % 12 + 1, 1)
-            return (next_month - timedelta(days=1)).isoformat()
+        value = month_end(year, month)
+        if value:
+            return value
+
+    english_month_match = re.search(
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December|"
+        r"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(20\d{2})\b",
+        query,
+        flags=re.I,
+    )
+    if english_month_match:
+        return month_end(
+            int(english_month_match.group(2)),
+            english_months[english_month_match.group(1).lower()],
+        )
 
     current_week_start = anchor - timedelta(days=anchor.weekday())
     if re.search(r"上上周|前一个完整周", query):
@@ -1575,7 +1626,7 @@ def materials_for(node_id: str, frontend_node: dict[str, Any], runtime: dict[str
         "retrieved_facts": [
             f"状态来源：{runtime['artifact_mode']} artifact / {runtime['domain']}",
             f"状态材料要求：{', '.join(materials) if materials else '无显式材料要求'}",
-            "当前阶段展示写作图与状态级绑定；接入 iFinD 后可替换为真实检索数据。",
+            "当前阶段展示写作 DFA 与状态级绑定；接入 iFinD 后可替换为真实检索数据。",
         ],
     }
 
@@ -1922,7 +1973,7 @@ def materials_for(
     elif runtime.get("evidence", {}).get("enabled"):
         facts.append(f"Evidence retrieval produced no binding for this state; status={runtime.get('evidence', {}).get('status')}.")
     else:
-        facts.append("Writing-graph state-level material binding is active, but no external evidence source is enabled.")
+        facts.append("Writing-DFA state-level material binding is active, but no external evidence source is enabled.")
     return {
         "node_id": node_id,
         "label": frontend_node["label"],
@@ -2006,7 +2057,7 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
     subdfa = analysis["subdfa"]
     edges = analysis["template"]["edges"]
     using_user_dfa = analysis.get("runtime", {}).get("dfa_source") == "user"
-    user_dfa_name = analysis.get("runtime", {}).get("user_dfa", {}).get("name", "我的写作图") if using_user_dfa else ""
+    user_dfa_name = analysis.get("runtime", {}).get("user_dfa", {}).get("name", "我的 DFA") if using_user_dfa else ""
     steps = [
         {
             "title": "接收 Query",
@@ -2016,11 +2067,11 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
             "detail": {"query": analysis["query"], "constraints": analysis["constraints"]},
         },
         {
-            "title": "读取我的写作图" if using_user_dfa else "AutoLogic 离线诱导",
+            "title": "读取我的 DFA" if using_user_dfa else "AutoLogic 离线诱导",
             "description": (
-                f"读取用户保存的“{user_dfa_name}”，使用其段落状态、材料要求与转移结构构建本次查询执行图。"
+                f"读取用户保存的“{user_dfa_name}”，使用其段落状态、材料要求与转移结构构建本次 Query-Specific Sub-DFA。"
                 if using_user_dfa
-                else "从同领域历史报告对齐语义状态、统计稳定转移并诱导归一化证据条件，生成或读取全局写作图。"
+                else "从同领域历史报告对齐语义状态、统计稳定转移并诱导归一化证据条件，生成或读取全局写作 DFA。"
             ),
             "active_nodes": [node["id"] for node in analysis["template"]["nodes"]],
             "active_edges": [edge["id"] for edge in edges],
@@ -2050,8 +2101,8 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
             "detail": {"tau": analysis["tau"], "fallback_top_k": analysis["runtime"]["fallback_top_k"], "matched_states": matched_states},
         },
         {
-            "title": "候选执行图",
-            "description": "从初始状态到各命中状态寻找历史支持度最高的路径，并合并为候选子图。",
+            "title": "候选 Sub-DFA",
+            "description": "从初始状态到各命中状态寻找历史支持度最高的路径，并合并为候选 Sub-DFA。",
             "active_nodes": analysis["raw_subdfa"]["node_ids"],
             "active_edges": analysis["raw_subdfa"]["edge_ids"],
             "detail": {
@@ -2061,8 +2112,8 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
             },
         },
         {
-            "title": "Query-Specific Execution Graph",
-            "description": "根据当前对话和条件优先级，从候选子图中选择确定性的可执行路径。",
+            "title": "Query-Specific Sub-DFA",
+            "description": "根据当前对话和条件优先级，从候选 Sub-DFA 中选择确定性的可执行路径。",
             "active_nodes": subdfa["node_ids"],
             "active_edges": subdfa["edge_ids"],
             "detail": {"visual_nodes": subdfa["node_ids"], "visual_edges": subdfa["edge_ids"]},
@@ -2082,7 +2133,7 @@ def build_steps(analysis: dict[str, Any], report_sections: list[dict[str, Any]])
         steps.append(
             {
                 "title": f"生成片段 {index + 1}: {section['label']}",
-                "description": "按照查询执行图的确定性顺序逐状态生成，并只向下一状态传递摘要。",
+                "description": "按照 Query-Specific Sub-DFA 的确定性顺序逐状态生成，并只向下一状态传递摘要。",
                 "active_nodes": [section["node_id"]],
                 "active_edges": [edge] if edge else [],
                 "generated_until": index + 1,
@@ -2147,7 +2198,7 @@ def build_analysis(query: str, tau: float = 0.5, payload: dict[str, Any] | None 
         "dfa_source": "user" if isinstance(custom_dfa, dict) else "system",
         "user_dfa": {
             "id": _custom_dfa_text(custom_dfa.get("id"), 160),
-            "name": _custom_dfa_text(custom_dfa.get("name") or "我的写作图", 160),
+            "name": _custom_dfa_text(custom_dfa.get("name") or "我的 DFA", 160),
             "base_domain": _custom_dfa_text(custom_dfa.get("baseDomain") or domain_key, 80),
         } if isinstance(custom_dfa, dict) else None,
         "rebuilt": artifacts["rebuilt"],

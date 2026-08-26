@@ -522,7 +522,7 @@ def save_template_dfa(
                 """,
                 (
                     dfa_id,
-                    str(graph.get("name") or "上传模板写作图"),
+                    str(graph.get("name") or "上传模板 DFA"),
                     str(graph.get("baseDomain") or "macro"),
                     str(graph.get("category") or "未分类模板"),
                     str(graph.get("origin") or "uploaded-template"),
@@ -553,7 +553,7 @@ def save_template_dfa(
                 """,
                 (
                     dfa_id,
-                    str(graph.get("name") or "上传模板写作图"),
+                    str(graph.get("name") or "上传模板 DFA"),
                     str(graph.get("baseDomain") or "macro"),
                     str(graph.get("category") or "未分类模板"),
                     str(graph.get("origin") or "uploaded-template"),

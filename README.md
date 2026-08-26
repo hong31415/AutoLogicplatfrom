@@ -1,14 +1,14 @@
-# AutoLogic Studio · Executable Writing Graph Platform
+# AutoLogic Studio · Evidence-Grounded Writing DFA Platform
 
-AutoLogic Studio is a bilingual, evidence-driven research report workspace. It builds a query-specific execution graph from an offline global writing graph, retrieves market evidence, exposes the complete execution trace, and generates or revises structured reports in Chinese or English. Legacy code and environment-variable names retain `DFA`/`SUBDFA` for backward compatibility; the interface does not claim that the reusable graph is a classical DFA.
+AutoLogic Studio is a bilingual, evidence-driven research report workspace. It induces a reusable Global Writing DFA from historical reports, constructs a Query-Specific Sub-DFA for each request, binds market evidence to its states, exposes the complete execution trace, and generates or revises structured reports in Chinese or English.
 
 ## Highlights
 
 - Chinese and International/English interfaces with language-aware model output
-- Offline global writing-graph views for precious metals, ETF, macro, cotton, and agriculture
-- User-created and editable writing graphs
-- Upload-driven writing-graph induction for TXT, Markdown, CSV, JSON, HTML, DOCX, PPTX, XLSX, and PDF templates, with live progress, classified storage, preview, reuse, and editable copies
-- Query parsing, semantic state matching, query-specific execution-graph construction, evidence binding, and report assembly traces
+- Offline Global Writing DFA views for precious metals, ETF, macro, cotton, and agriculture
+- User-created and editable DFAs
+- Upload-driven DFA induction for TXT, Markdown, CSV, JSON, HTML, DOCX, PPTX, XLSX, and PDF templates, with live progress, classified storage, preview, reuse, and editable copies
+- Query parsing, semantic state matching, Query-Specific Sub-DFA construction, evidence binding, and report assembly traces
 - DeepSeek-compatible report generation and configurable embedding providers
 - AkShare, Tushare, optional iFinD, and optional MySQL integrations
 - Markdown report download and version-preserving report revision
@@ -31,7 +31,7 @@ subdfa-report-platform/
   start_all.ps1                # Starts frontend and backend together
 ```
 
-Personal queries, custom user writing graphs, raw corpora, retrieved market data, logs, databases, `.env`, and proprietary vendor binaries are intentionally excluded from Git.
+Personal queries, custom user DFAs, raw corpora, retrieved market data, logs, databases, `.env`, and proprietary vendor binaries are intentionally excluded from Git.
 
 ## Online frontend showcase
 
@@ -39,7 +39,7 @@ Open the anonymous repository: <https://anonymous.4open.science/r/autologic-revi
 
 Open the anonymous interactive frontend: <https://anonymous.4open.science/w/autologic-review/>
 
-The anonymous review mirror can expose the static frontend as an interactive browser demo. It constructs a query-specific DFA, visualizes state matching and execution, assembles a clearly labelled demo report, and stores uploaded-template DFA records in IndexedDB on the current device. Live market data, cross-device persistence, and model-generated conclusions require the Python backend; use the Windows quick start below for the complete application.
+The anonymous review mirror exposes the static frontend as an interactive browser demo. It constructs a Query-Specific Sub-DFA from a Global Writing DFA, visualizes state matching and execution, assembles a clearly labelled demo report, and stores uploaded-template DFA records in IndexedDB on the current device. Live market data, cross-device persistence, and model-generated conclusions require the Python backend; use the Windows quick start below for the complete application.
 
 ## Quick start on Windows
 
@@ -126,7 +126,7 @@ SUBDFA_DATABASE_PASSWORD=
 
 ## Private training corpus
 
-The repository includes sanitized derived writing-graph artifacts for the offline demonstration, not the raw FinLDP corpus. To re-induce a writing graph from a corpus you are authorized to use:
+The repository includes sanitized derived Global Writing DFA artifacts for the offline demonstration, not the raw FinLDP corpus. To re-induce a Global Writing DFA from a corpus you are authorized to use:
 
 ```dotenv
 FINLDP_ROOT=D:\path\to\your\FinLDP-Bench
@@ -157,7 +157,7 @@ Content-Type: application/json
 }
 ```
 
-Template-induced writing graphs are built as background jobs. Uploaded source files and a local DFA record are retained under `backend/data/template_uploads/`; when database persistence is enabled, the same record is also indexed in `template_dfas`.
+Template-induced DFAs are built as background jobs. Uploaded source files and a local DFA record are retained under `backend/data/template_uploads/`; when database persistence is enabled, the same record is also indexed in `template_dfas`.
 
 ```http
 POST /api/v1/template-dfa-jobs
@@ -181,7 +181,7 @@ Content-Type: application/json
 ## Privacy checklist before publishing
 
 1. Keep all real credentials only in `backend/.env`.
-2. Run the runtime sanitizer after rebuilding writing-graph artifacts:
+2. Run the runtime sanitizer after rebuilding Global Writing DFA artifacts:
 
    ```powershell
    python scripts/sanitize_runtime.py

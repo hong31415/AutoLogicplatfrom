@@ -430,8 +430,8 @@
             <small>建议上传 2–10 份同领域、同报告类型的样本</small>
           </div>
           <div class="upload-builder-fields">
-            <label><span>DFA 名称</span><input id="uploadDfaNameInput" type="text" maxlength="120" placeholder="如：贵金属周报 DFA" /></label>
-            <label><span>模板分类</span><input id="uploadDfaCategoryInput" type="text" maxlength="80" list="templateCategorySuggestions" placeholder="如：周报 / 策略报告" /></label>
+            <label><span>DFA 名称</span><input id="uploadDfaNameInput" name="demo_dfa_name" type="text" maxlength="120" autocomplete="off" placeholder="如：贵金属周报 DFA" /></label>
+            <label><span>模板分类</span><input id="uploadDfaCategoryInput" name="demo_template_category" type="text" maxlength="80" autocomplete="off" list="templateCategorySuggestions" placeholder="如：周报 / 策略报告" /></label>
             <datalist id="templateCategorySuggestions"><option value="周报模板"></option><option value="月报模板"></option><option value="专题报告"></option><option value="策略报告"></option><option value="行业跟踪"></option></datalist>
             <label><span>报告领域</span><select id="uploadDfaDomainSelect"><option value="auto">自动识别</option><option value="precious_metals">贵金属 / 有色</option><option value="etf">ETF</option><option value="macro">宏观</option><option value="cotton">棉花</option><option value="agriculture">农产品</option></select></label>
             <label class="upload-threshold-field"><span>稳定模式阈值 θ <strong id="uploadDfaThetaValue">0.30</strong></span><input id="uploadDfaThetaInput" type="range" min="0.05" max="0.90" step="0.05" value="0.30" /><small>样本少时建议 0.20–0.35；样本多时可提高阈值过滤偶然结构。</small></label>
@@ -552,7 +552,7 @@
     </dialog>
 
     <script src="./pages-demo.js?v=20260826dfa"></script>
-    <script src="./i18n.js?v=20260826dfa"></script>
-    <script src="./app.js?v=20260826dfa"></script>
+    <script src="./i18n.js?v=20260827final6"></script>
+    <script src="./app.js?v=20260827final6"></script>
   </body>
 </html>

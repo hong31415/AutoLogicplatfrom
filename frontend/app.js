@@ -14,7 +14,14 @@ const COMPOSER_DFA_STORAGE_KEY = "autologic-composer-dfa-v1";
 const IS_GITHUB_PAGES = window.location.hostname.endsWith(".github.io");
 const NODE_W = 208;
 const NODE_H = 78;
-const IS_ENGLISH = window.AutoLogicI18n?.language === "en";
+// Read the same persisted language flag as i18n.js directly. This keeps
+// runtime-generated cards in English even if a cached browser tab evaluates
+// app.js before window.AutoLogicI18n is reattached during a hard navigation.
+const IS_ENGLISH = (
+  window.AutoLogicI18n?.language === "en"
+  || document.documentElement.lang === "en"
+  || localStorage.getItem("autologic-language-v1") === "en"
+);
 const ui = (chinese, english) => IS_ENGLISH ? english : chinese;
 const THRESHOLD_PRESETS = Object.freeze({
   core: { theta: 0.70, tau: 0.45, topK: 2, summary: ui("核心 · 只保留关键状态", "Core · Key states only") },
@@ -831,11 +838,22 @@ function copyUploadedDfaToEditor(id) {
 
 function updateUploadBuildProgress(job) {
   const progress = Math.max(0, Math.min(100, Number(job.progress || 0)));
-  const stageLabels = {queued: "等待处理", validating: "检查文件", extracting: "解析文件", classifying: "识别领域", aligning: "对齐状态", inducing: "归纳转移", validating_graph: "检查结构", saving: "分类保存", complete: "构建完成", error: "构建失败"};
+  const stageLabels = {
+    queued: ui("等待处理", "Queued"),
+    validating: ui("检查文件", "Validating files"),
+    extracting: ui("解析文件", "Extracting content"),
+    classifying: ui("识别领域", "Classifying domain"),
+    aligning: ui("对齐状态", "Aligning states"),
+    inducing: ui("归纳转移", "Inducing transitions"),
+    validating_graph: ui("检查结构", "Validating DFA"),
+    saving: ui("分类保存", "Saving by category"),
+    complete: ui("构建完成", "DFA constructed"),
+    error: ui("构建失败", "Build failed")
+  };
   els.uploadDfaProgress.hidden = false;
-  els.uploadDfaProgressStage.textContent = stageLabels[job.stage] || job.stage || "正在构建";
+  els.uploadDfaProgressStage.textContent = stageLabels[job.stage] || job.stage || ui("正在构建", "Building DFA");
   els.uploadDfaProgressPercent.textContent = `${progress}%`;
-  els.uploadDfaProgressMessage.textContent = job.error || job.message || "正在处理上传模板。";
+  els.uploadDfaProgressMessage.textContent = job.error || job.message || ui("正在处理上传模板。", "Processing uploaded templates.");
   els.uploadDfaProgressBar.style.width = `${progress}%`;
   const order = ["extracting", "classifying", "aligning", "inducing", "saving"];
   const current = job.stage === "validating_graph" ? 3 : job.stage === "complete" ? 5 : order.indexOf(job.stage);
@@ -855,9 +873,12 @@ async function pollUploadDfaBuild() {
     if (job.status === "complete") {
       state.uploadBuildJobId = null;
       els.startUploadDfaBuild.disabled = false;
-      els.startUploadDfaBuild.textContent = "开始构建下一个 DFA";
+      els.startUploadDfaBuild.textContent = ui("开始构建下一个 DFA", "Build another DFA");
       const skipped = job.quality?.file_errors?.length || 0;
-      els.uploadDfaSummary.textContent = `构建完成：${job.quality?.state_count || 0} 个状态、${job.quality?.transition_count || 0} 条转移，已按分类保存${skipped ? `；${skipped} 个文件解析失败，可在构建日志中查看原因` : ""}。`;
+      els.uploadDfaSummary.textContent = ui(
+        `构建完成：${job.quality?.state_count || 0} 个状态、${job.quality?.transition_count || 0} 条转移，已按分类保存${skipped ? `；${skipped} 个文件解析失败，可在构建日志中查看原因` : ""}。`,
+        `DFA constructed with ${job.quality?.state_count || 0} states and ${job.quality?.transition_count || 0} transitions and saved by category${skipped ? `; ${skipped} file(s) could not be parsed—see the build log` : ""}.`
+      );
       await loadUploadedDfaLibrary();
       if (job.result_dfa_id) previewUploadedDfa(job.result_dfa_id);
       return;
@@ -865,12 +886,12 @@ async function pollUploadDfaBuild() {
     if (job.status === "error") {
       state.uploadBuildJobId = null;
       els.startUploadDfaBuild.disabled = false;
-      els.startUploadDfaBuild.textContent = "修正后重新构建";
+      els.startUploadDfaBuild.textContent = ui("修正后重新构建", "Fix and rebuild");
       return;
     }
     state.uploadBuildPollTimer = window.setTimeout(pollUploadDfaBuild, 650);
   } catch (error) {
-    els.uploadDfaProgressMessage.textContent = `进度读取暂时失败：${error.message}`;
+    els.uploadDfaProgressMessage.textContent = ui(`进度读取暂时失败：${error.message}`, `Unable to read progress: ${error.message}`);
     state.uploadBuildPollTimer = window.setTimeout(pollUploadDfaBuild, 1400);
   }
 }
@@ -879,18 +900,18 @@ async function startUploadDfaBuild() {
   if (!state.uploadFiles.length || state.uploadBuildJobId) return;
   const totalSize = state.uploadFiles.reduce((sum, file) => sum + file.size, 0);
   if (totalSize > 40 * 1024 * 1024) {
-    els.uploadDfaSummary.textContent = "本次文件总大小超过 40 MB，请分批构建。";
+    els.uploadDfaSummary.textContent = ui("本次文件总大小超过 40 MB，请分批构建。", "The selected files exceed 40 MB; build them in smaller batches.");
     return;
   }
   els.startUploadDfaBuild.disabled = true;
-  els.startUploadDfaBuild.textContent = "正在准备上传…";
+  els.startUploadDfaBuild.textContent = ui("正在准备上传…", "Preparing upload…");
   els.uploadDfaProgress.hidden = false;
-  updateUploadBuildProgress({status: "queued", stage: "queued", progress: 1, message: "正在读取本地文件并创建构建任务。", logs: []});
+  updateUploadBuildProgress({status: "queued", stage: "queued", progress: 1, message: ui("正在读取本地文件并创建构建任务。", "Reading local files and creating the DFA build job."), logs: []});
   try {
     const files = [];
     for (let index = 0; index < state.uploadFiles.length; index += 1) {
       const file = state.uploadFiles[index];
-      els.uploadDfaProgressMessage.textContent = `正在读取 ${index + 1} / ${state.uploadFiles.length}：${file.name}`;
+      els.uploadDfaProgressMessage.textContent = ui(`正在读取 ${index + 1} / ${state.uploadFiles.length}：${file.name}`, `Reading ${index + 1} / ${state.uploadFiles.length}: ${file.name}`);
       files.push({name: file.name, type: file.type, size: file.size, content_base64: await fileToBase64(file)});
     }
     const job = await apiPost("/template-dfa-jobs", {
@@ -901,13 +922,13 @@ async function startUploadDfaBuild() {
       files
     });
     state.uploadBuildJobId = job.job_id;
-    els.startUploadDfaBuild.textContent = "构建进行中…";
+    els.startUploadDfaBuild.textContent = ui("构建进行中…", "Building DFA…");
     updateUploadBuildProgress(job);
     pollUploadDfaBuild();
   } catch (error) {
     state.uploadBuildJobId = null;
     els.startUploadDfaBuild.disabled = false;
-    els.startUploadDfaBuild.textContent = "重新开始构建";
+    els.startUploadDfaBuild.textContent = ui("重新开始构建", "Restart build");
     updateUploadBuildProgress({status: "error", stage: "error", progress: 0, error: error.message, logs: [{time: new Date().toLocaleTimeString(), message: error.message}]});
   }
 }
@@ -1055,12 +1076,14 @@ function updateComposerMode() {
   els.composer.classList.toggle("revision-mode", revisionMode);
   els.composerFields.hidden = revisionMode;
   els.query.placeholder = revisionMode
-    ? "继续调整报告，例如：缩短结论，并加强风险提示"
-    : "输入报告主题、目标读者和关注重点";
+    ? ui("继续调整报告，例如：缩短结论，并加强风险提示", "Refine the report, e.g. shorten the conclusion and strengthen risk factors")
+    : ui("输入报告主题、目标读者和关注重点", "Enter the report topic, target audience, and key focus");
   els.modeButton.innerHTML = revisionMode
-    ? "<span></span> 继续调整报告"
-    : "<span></span> 证据驱动";
-  els.composerRun.title = revisionMode ? "发送修改要求" : "发送并生成报告";
+    ? `<span></span> ${ui("继续调整报告", "Refine Report")}`
+    : `<span></span> ${ui("证据驱动", "Evidence Driven")}`;
+  els.composerRun.title = revisionMode
+    ? ui("发送修改要求", "Send Revision Request")
+    : ui("发送并生成报告", "Send and Generate Report");
   els.composerRun.setAttribute("aria-label", els.composerRun.title);
 }
 
@@ -1070,19 +1093,36 @@ function renderRevisionThread() {
     const failed = revision.status === "error";
     const sections = Array.isArray(revision.sections) ? revision.sections : [];
     const hasReport = revision.status === "complete" && sections.length > 0;
-    const replyTitle = pending ? "正在调整报告" : failed ? "调整失败" : "报告已更新";
-    const replyText = pending
-      ? "正在根据你的要求重写报告，并保留当前证据与时间边界。"
+    const replyTitle = pending
+      ? ui("正在调整报告", "Revising Report")
       : failed
-        ? revision.message
-        : revision.message || "已按要求生成完整的新版本，上一版本继续保留。";
+        ? ui("调整失败", "Revision Failed")
+        : ui("报告已更新", "Report Updated");
+    const storedRevisionMessage = String(revision.message || "");
+    const localizedRevisionMessage = IS_ENGLISH && /[\u3400-\u9fff]/.test(storedRevisionMessage)
+      ? ui(
+        storedRevisionMessage,
+        `A complete V${Number(revision.version || 2)} was generated with ${revision.model || state.response?.model || "the current model"}; V${Math.max(1, Number(revision.version || 2) - 1)} is preserved.`
+      )
+      : storedRevisionMessage;
+    const replyText = pending
+      ? ui(
+        "正在根据你的要求重写报告，并保留当前证据与时间边界。",
+        "The report is being revised while preserving the current evidence and time boundaries."
+      )
+      : failed
+        ? localizedRevisionMessage
+        : localizedRevisionMessage || ui(
+          "已按要求生成完整的新版本，上一版本继续保留。",
+          "A complete revised version has been generated; the previous version is preserved."
+        );
     const reportContent = hasReport ? `
       <header class="revision-report-header">
-        <div><span>Revised Report · V${Number(revision.version || 2)}</span><h3>完整修订报告</h3></div>
+        <div><span>Revised Report · V${Number(revision.version || 2)}</span><h3>${ui("完整修订报告", "Complete Revised Report")}</h3></div>
         <div class="revision-report-tools">
           <small>${escapeHtml(revision.model || state.response?.model || "AutoLogic")}</small>
-          <button type="button" class="icon-button" data-revision-action="copy" data-revision-id="${escapeHtml(revision.id)}" title="复制 V${Number(revision.version || 2)} 报告" aria-label="复制 V${Number(revision.version || 2)} 报告">⧉</button>
-          <button type="button" class="icon-button" data-revision-action="download" data-revision-id="${escapeHtml(revision.id)}" title="下载 V${Number(revision.version || 2)} Markdown 报告" aria-label="下载 V${Number(revision.version || 2)} Markdown 报告">⇩</button>
+          <button type="button" class="icon-button" data-revision-action="copy" data-revision-id="${escapeHtml(revision.id)}" title="${ui(`复制 V${Number(revision.version || 2)} 报告`, `Copy V${Number(revision.version || 2)} Report`)}" aria-label="${ui(`复制 V${Number(revision.version || 2)} 报告`, `Copy V${Number(revision.version || 2)} Report`)}">⧉</button>
+          <button type="button" class="icon-button" data-revision-action="download" data-revision-id="${escapeHtml(revision.id)}" title="${ui(`下载 V${Number(revision.version || 2)} Markdown 报告`, `Download V${Number(revision.version || 2)} Markdown Report`)}" aria-label="${ui(`下载 V${Number(revision.version || 2)} Markdown 报告`, `Download V${Number(revision.version || 2)} Markdown Report`)}">⇩</button>
         </div>
       </header>
       <div class="revision-report-note">${escapeHtml(replyText)}</div>
@@ -1096,8 +1136,8 @@ function renderRevisionThread() {
     return `
       <section class="revision-exchange">
         <div class="user-message-row revision-user-row">
-          <div class="user-bubble"><span>你的调整</span><p>${escapeHtml(revision.instruction)}</p></div>
-          <div class="user-avatar" aria-hidden="true">你</div>
+          <div class="user-bubble"><span>${ui("你的调整", "Your Revision")}</span><p>${escapeHtml(revision.instruction)}</p></div>
+          <div class="user-avatar" aria-hidden="true">${ui("你", "You")}</div>
         </div>
         <div class="assistant-message-row revision-assistant-row">
           <img class="assistant-avatar" src="./assets/autologic-studio-mark-light.png?v=20260802a" alt="" aria-hidden="true" />
@@ -1739,12 +1779,12 @@ function reportInternalDfaHtml(node) {
     .map((stage) => ({ stage, states: states.filter((item) => item.stage === stage) }))
     .filter((group) => group.states.length);
   return `
-    <section class="report-internal-dfa" aria-label="${escapeHtml(node.label || node.id)}段落执行轨迹">
+    <section class="report-internal-dfa" aria-label="${escapeHtml(ui(`${node.label || node.id}段落执行轨迹`, `${node.label || node.id} section execution trace`))}">
       <header>
-        <div><span>Section Trace</span><strong>${escapeHtml(node.label || node.id)} · 段落执行轨迹</strong></div>
-        <small>${states.length} 个状态 · ${transitions.length} 条转移${internalDfa.source_case_files ? ` · ${Number(internalDfa.source_case_files).toLocaleString()} 个 Case` : ""}</small>
+        <div><span>Section Trace</span><strong>${escapeHtml(node.label || node.id)} · ${ui("段落执行轨迹", "Section Execution Trace")}</strong></div>
+        <small>${ui(`${states.length} 个状态 · ${transitions.length} 条转移`, `${states.length} states · ${transitions.length} transitions`)}${internalDfa.source_case_files ? ` · ${Number(internalDfa.source_case_files).toLocaleString()} ${ui("个 Case", "Cases")}` : ""}</small>
       </header>
-      <div class="report-dfa-flow" aria-label="段落执行阶段顺序">
+      <div class="report-dfa-flow" aria-label="${ui("段落执行阶段顺序", "Section execution stage order")}">
         ${groups.map((group, index) => `
           <span><b>${escapeHtml(INTERNAL_DFA_STAGE_LABELS[group.stage])}</b><small>${group.states.length}</small></span>
           ${index < groups.length - 1 ? '<i aria-hidden="true">→</i>' : ""}
@@ -1756,7 +1796,7 @@ function reportInternalDfaHtml(node) {
             <header><strong>${escapeHtml(INTERNAL_DFA_STAGE_LABELS[group.stage])}</strong><small>${group.states.length} states</small></header>
             <div>${group.states.map((item) => `
               <article>
-                <div><span>${escapeHtml(item.id)}</span>${item.support_documents ? `<small>${Number(item.support_documents).toLocaleString()} 篇支持</small>` : ""}</div>
+                <div><span>${escapeHtml(item.id)}</span>${item.support_documents ? `<small>${ui(`${Number(item.support_documents).toLocaleString()} 篇支持`, `${Number(item.support_documents).toLocaleString()} supporting documents`)}</small>` : ""}</div>
                 <strong>${escapeHtml(item.label || item.id)}</strong>
                 <p>${escapeHtml(item.detail || "")}</p>
               </article>
@@ -1765,16 +1805,16 @@ function reportInternalDfaHtml(node) {
         `).join("")}
       </div>
       <details class="report-dfa-transitions">
-        <summary>查看全部 ${transitions.length} 条内部转移</summary>
+        <summary>${ui(`查看全部 ${transitions.length} 条内部转移`, `View all ${transitions.length} internal transitions`)}</summary>
         <div>${transitions.map((item) => `
-          <article><strong>${escapeHtml(item.source)} → ${escapeHtml(item.target)}</strong><span>${escapeHtml(item.condition || "TRUE")}</span>${item.support_documents ? `<small>${Number(item.support_documents).toLocaleString()} 篇关联支持</small>` : ""}</article>
+          <article><strong>${escapeHtml(item.source)} → ${escapeHtml(item.target)}</strong><span>${escapeHtml(item.condition || "TRUE")}</span>${item.support_documents ? `<small>${ui(`${Number(item.support_documents).toLocaleString()} 篇关联支持`, `${Number(item.support_documents).toLocaleString()} linked supporting documents`)}</small>` : ""}</article>
         `).join("")}</div>
       </details>
       ${patterns.length ? `
         <details class="report-dfa-patterns">
-          <summary>查看 ${patterns.length} 种关联训练序列</summary>
+          <summary>${ui(`查看 ${patterns.length} 种关联训练序列`, `View ${patterns.length} associated training sequences`)}</summary>
           <div>${patterns.map((pattern, index) => `
-            <article><span>P${String(index + 1).padStart(2, "0")}</span><strong>${(pattern.states || []).map((item) => escapeHtml(item)).join(" → ")}</strong><small>${Number(pattern.documents || 0).toLocaleString()} 篇 · ${(Number(pattern.frequency || 0) * 100).toFixed(2)}%</small></article>
+            <article><span>P${String(index + 1).padStart(2, "0")}</span><strong>${(pattern.states || []).map((item) => escapeHtml(item)).join(" → ")}</strong><small>${Number(pattern.documents || 0).toLocaleString()} ${ui("篇", "documents")} · ${(Number(pattern.frequency || 0) * 100).toFixed(2)}%</small></article>
           `).join("")}</div>
         </details>
       ` : ""}
@@ -1793,8 +1833,8 @@ function reportSectionHtml(section, index, versionKey = "v1") {
       <div class="report-section-main"${hasInternalDfa ? ` role="button" tabindex="0" data-report-dfa-node="${escapeHtml(nodeId)}" data-report-dfa-key="${escapeHtml(dfaKey)}" aria-expanded="${expanded}"` : ""}>
         <h4>
           <span>S${String(index + 1).padStart(2, "0")}</span>
-          ${escapeHtml(section.order || index + 1)}. ${escapeHtml(section.label || "报告片段")}
-          ${hasInternalDfa ? `<small class="report-dfa-hint">◇ ${expanded ? "收起段落执行轨迹" : "查看段落执行轨迹"}</small>` : ""}
+          ${escapeHtml(section.order || index + 1)}. ${escapeHtml(section.label || ui("报告片段", "Report Section"))}
+          ${hasInternalDfa ? `<small class="report-dfa-hint">◇ ${ui(expanded ? "收起段落执行轨迹" : "查看段落执行轨迹", expanded ? "Collapse Section Trace" : "View Section Trace")}</small>` : ""}
         </h4>
         <p>${escapeHtml(section.content || "")}</p>
       </div>
@@ -1929,7 +1969,9 @@ function renderReport() {
   const generatedUntil = event?.type === "assembly" ? sections.length : 0;
   const hasCompleteRevision = state.revisions.some((revision) => revision.status === "complete");
   els.primaryKicker.textContent = hasCompleteRevision ? "Original Report · V1" : "Primary Output";
-  els.primaryTitle.textContent = hasCompleteRevision ? "原始报告（已保留）" : "生成报告";
+  els.primaryTitle.textContent = hasCompleteRevision
+    ? ui("原始报告（已保留）", "Original Report (Preserved)")
+    : ui("生成报告", "Generated Report");
   els.copyReport.hidden = false;
   els.downloadReport.hidden = false;
   els.reportMeta.innerHTML = [
@@ -2045,7 +2087,7 @@ async function refineReport() {
   autoResizeComposer();
   setBusy(true);
   renderRevisionThread();
-  els.apiStatus.textContent = "正在按要求调整报告";
+  els.apiStatus.textContent = ui("正在按要求调整报告", "Revising Report as Requested");
   els.apiStatus.classList.remove("error");
   scrollToBottom();
   try {
@@ -2065,11 +2107,19 @@ async function refineReport() {
     revision.sections = data.report_sections;
     revision.model = data.model;
     revision.message = data.ai_used
-      ? `已使用 ${data.model || "当前模型"} 生成完整 V${revision.version}，V${revision.version - 1} 继续保留。`
-      : `已生成完整 V${revision.version}，V${revision.version - 1} 继续保留。`;
+      ? ui(
+        `已使用 ${data.model || "当前模型"} 生成完整 V${revision.version}，V${revision.version - 1} 继续保留。`,
+        `A complete V${revision.version} was generated with ${data.model || "the current model"}; V${revision.version - 1} is preserved.`
+      )
+      : ui(
+        `已生成完整 V${revision.version}，V${revision.version - 1} 继续保留。`,
+        `A complete V${revision.version} was generated; V${revision.version - 1} is preserved.`
+      );
     renderReport();
-    els.reportProgress.textContent = "原始版本 · 已保留";
-    els.apiStatus.textContent = data.ai_used ? `调整完成 · ${data.model}` : "调整完成 · 本地处理";
+    els.reportProgress.textContent = ui("原始版本 · 已保留", "Original Version · Preserved");
+    els.apiStatus.textContent = data.ai_used
+      ? ui(`调整完成 · ${data.model}`, `Revision Complete · ${data.model}`)
+      : ui("调整完成 · 本地处理", "Revision Complete · Local Processing");
     updateHistoryRun({
       sections: state.analysis.report_sections,
       analysisSnapshot: compactAnalysisForHistory(state.analysis),
@@ -2086,8 +2136,8 @@ async function refineReport() {
   } catch (error) {
     revision.status = "error";
     revision.message = error.message;
-    els.reportProgress.textContent = `重写失败：${error.message}`;
-    els.apiStatus.textContent = "调整失败";
+    els.reportProgress.textContent = ui(`重写失败：${error.message}`, `Revision failed: ${error.message}`);
+    els.apiStatus.textContent = ui("调整失败", "Revision Failed");
     els.apiStatus.classList.add("error");
   } finally {
     setBusy(false);
@@ -3115,18 +3165,22 @@ function graphRenderData(nodes, edges, event, routeNodes, routeEdges, activeNode
     return activeEdges.has(edge.id);
   });
   visibleOrder = topologicalNodeOrder(visibleOrder, focusedEdges);
-  const gap = 58;
-  const top = 42;
-  const left = 60;
+  const gap = 34;
+  const top = 48;
+  const left = 54;
   const focusedNodes = visibleOrder
     .filter((id) => sourceById[id])
     .map((id, index) => ({ ...sourceById[id], x: left, y: top + index * (NODE_H + gap) }));
-  const height = Math.max(300, top * 2 + focusedNodes.length * NODE_H + Math.max(0, focusedNodes.length - 1) * gap);
+  const width = Math.max(420, left * 2 + NODE_W);
+  const height = Math.max(
+    300,
+    top * 2 + focusedNodes.length * NODE_H + Math.max(0, focusedNodes.length - 1) * gap
+  );
   return {
     nodes: focusedNodes,
     edges: focusedEdges,
     full: false,
-    viewport: [0, 0, NODE_W + left * 2, height]
+    viewport: [0, 0, width, height]
   };
 }
 
@@ -3136,13 +3190,13 @@ function drawGraph() {
     els.svg.setAttribute("viewBox", "0 0 720 420");
     els.svg.style.width = "100%";
     els.svg.style.height = "100%";
-    els.graphSummary.textContent = "等待 Query-Specific Sub-DFA 构建";
+    els.graphSummary.textContent = ui("等待 Query-Specific Sub-DFA 构建", "Waiting for Query-Specific Sub-DFA construction");
     const text = makeSvg("text");
     text.setAttribute("x", "360");
     text.setAttribute("y", "210");
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("class", "graph-placeholder");
-    text.textContent = "等待标注 DFA 转移条件";
+    text.textContent = ui("等待标注 DFA 转移条件", "Waiting for condition-labeled DFA transitions");
     els.svg.appendChild(text);
     return;
   }
@@ -3163,7 +3217,7 @@ function drawGraph() {
     els.svg.style.width = `${Math.max(viewport[2], els.graphShell.clientWidth)}px`;
     els.svg.style.height = `${Math.max(viewport[3], els.graphShell.clientHeight)}px`;
   } else {
-    els.svg.style.width = "100%";
+    els.svg.style.width = `${Math.max(viewport[2], els.graphShell.clientWidth)}px`;
     els.svg.style.height = `${Math.max(viewport[3], els.graphShell.clientHeight - 2)}px`;
   }
   const nodeById = Object.fromEntries(renderNodes.map((node) => [node.id, node]));
@@ -3173,7 +3227,10 @@ function drawGraph() {
   const generatedUntil = event.generatedUntil || 0;
   const visited = new Set((state.analysis.execution_order || []).slice(0, generatedUntil));
   const activeLabel = activeNodes.size <= 2 ? renderNodes.find((node) => activeNodes.has(node.id))?.label : "";
-  els.graphSummary.textContent = `${showFullGraph ? "全局写作 DFA" : "当前 Sub-DFA"} · ${renderNodes.length} 个状态 · ${renderEdges.length} 条转移${activeLabel ? ` · 当前：${activeLabel}` : ""}`;
+  els.graphSummary.textContent = ui(
+    `${showFullGraph ? "全局写作 DFA" : "当前 Sub-DFA"} · ${renderNodes.length} 个状态 · ${renderEdges.length} 条转移${activeLabel ? ` · 当前：${activeLabel}` : ""}`,
+    `${showFullGraph ? "Global Writing DFA" : "Current Sub-DFA"} · ${renderNodes.length} states · ${renderEdges.length} transitions${activeLabel ? ` · Current: ${activeLabel}` : ""}`
+  );
 
   const defs = makeSvg("defs");
   defs.innerHTML = `
@@ -3278,12 +3335,15 @@ function drawGraph() {
     const focusId = state.selectedNodeId || (event.activeNodes || [])[0];
     const focusNode = nodeById[focusId];
     window.requestAnimationFrame(() => {
-      els.graphShell.scrollLeft = 0;
       if (focusNode) {
         els.graphShell.scrollTo({
+          left: 0,
           top: Math.max(0, focusNode.y + NODE_H / 2 - els.graphShell.clientHeight / 2),
           behavior: "smooth"
         });
+      } else {
+        els.graphShell.scrollLeft = 0;
+        els.graphShell.scrollTop = 0;
       }
     });
   }

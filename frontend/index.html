@@ -257,7 +257,18 @@
                         <button class="active" type="button" data-view="construction">动态构建</button>
                         <button type="button" data-view="dfa">全局写作 DFA</button>
                       </div>
-                      <button id="graphExpandButton" class="graph-expand-button" type="button" title="放大查看 Query-Specific Sub-DFA" aria-label="放大查看 Query-Specific Sub-DFA">⛶</button>
+                      <div class="graph-inspection-tools" aria-label="DFA inspection controls">
+                        <div class="graph-layout-tabs" role="group" aria-label="DFA layout">
+                          <button class="active" type="button" data-graph-layout="auto" title="使用 DFA 原始布局">Auto</button>
+                          <button type="button" data-graph-layout="horizontal" title="水平排列 DFA">H</button>
+                          <button type="button" data-graph-layout="vertical" title="垂直排列 DFA">V</button>
+                        </div>
+                        <button id="graphZoomOutButton" type="button" title="缩小 DFA" aria-label="缩小 DFA">−</button>
+                        <strong id="graphZoomLabel" aria-live="polite">100%</strong>
+                        <button id="graphZoomInButton" type="button" title="放大 DFA" aria-label="放大 DFA">＋</button>
+                        <button id="graphFitButton" type="button" title="适应可视区域">Fit</button>
+                        <button id="graphExpandButton" class="graph-expand-button" type="button" title="放大查看 Query-Specific Sub-DFA" aria-label="放大查看 Query-Specific Sub-DFA">⛶</button>
+                      </div>
                     </div>
                     <div id="graphSummary" class="graph-summary">等待 Query-Specific Sub-DFA 构建</div>
                     <div id="graphShell" class="graph-shell">

@@ -230,6 +230,8 @@
     "应用条件约束选择路径": "Apply Conditions and Select Path",
     "本次 Query-Specific Sub-DFA 构建完成": "Query-Specific Sub-DFA Ready",
     "本次 Query-Specific Sub-DFA 已构建完成": "Query-Specific Sub-DFA Ready",
+    "Query-Specific Sub-DFA 构建完成": "Query-Specific Sub-DFA Ready",
+    "Query-Specific Sub-DFA 已构建完成": "Query-Specific Sub-DFA Ready",
     "Query-Specific Sub-DFA 构建过程": "Query-Specific Sub-DFA Construction",
     "报告生成过程": "Report Generation Process",
     "当前写作状态": "Current Writing State",
@@ -355,6 +357,10 @@
     ,"基于已绑定的提供方证据生成片段": "Generate section from bound provider evidence"
     ,"该 DFA 来自本机缓存的全局写作 DFA；本窗口不会调用市场数据或生成报告。": "This DFA comes from the locally cached global writing DFA. This window does not call market-data services or generate a report."
     ,"离线全局写作 DFA": "Offline Global Writing DFA"
+    ,"完整源码与本地启动说明请查看当前匿名仓库的 README。": "See the current anonymous repository README for the source code and local setup guide."
+    ,"内置演示证据": "Built-in Historical Demo Evidence"
+    ,"离线演示证据": "Historical Demo Evidence"
+    ,"生成完成 · 离线演示证据": "Generation Complete · Historical Demo Evidence"
   }));
 
   const replacements = [

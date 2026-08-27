@@ -11,7 +11,11 @@ const API_BASE = "/api/v1";
 const STORAGE_KEY = "autologic-history-v2";
 const MY_DFA_STORAGE_KEY = "autologic-user-dfas-v1";
 const COMPOSER_DFA_STORAGE_KEY = "autologic-composer-dfa-v1";
-const IS_GITHUB_PAGES = window.location.hostname.endsWith(".github.io");
+const IS_GITHUB_PAGES = (
+  window.location.hostname.endsWith(".github.io")
+  || window.location.hostname === "anonymous.4open.science"
+  || window.location.protocol === "file:"
+);
 const NODE_W = 208;
 const NODE_H = 78;
 // Read the same persisted language flag as i18n.js directly. This keeps
@@ -58,6 +62,9 @@ const state = {
   selectedNodeId: null,
   graphView: "construction",
   graphExpanded: false,
+  graphZoom: 1,
+  graphLayout: "auto",
+  evidenceSelection: { kind: "dataset", index: 0 },
   reportReady: false,
   busy: false,
   playToken: 0,
@@ -147,6 +154,10 @@ const els = {
   graphShell: document.getElementById("graphShell"),
   graphSummary: document.getElementById("graphSummary"),
   graphExpand: document.getElementById("graphExpandButton"),
+  graphZoomOut: document.getElementById("graphZoomOutButton"),
+  graphZoomIn: document.getElementById("graphZoomInButton"),
+  graphZoomLabel: document.getElementById("graphZoomLabel"),
+  graphFit: document.getElementById("graphFitButton"),
   svg: document.getElementById("dfaSvg"),
   decisionContextLabel: document.getElementById("decisionContextLabel"),
   decisionIndex: document.getElementById("decisionIndex"),
@@ -918,6 +929,7 @@ async function startUploadDfaBuild() {
       name: els.uploadDfaName.value.trim() || `${DFA_DOMAIN_LABELS[els.uploadDfaDomain.value] || "自动识别"} · 上传模板 DFA`,
       category: els.uploadDfaCategory.value.trim() || "未分类模板",
       domain: els.uploadDfaDomain.value,
+      language: state.language,
       frequency_threshold: Number(els.uploadDfaTheta.value || 0.3),
       files
     });
@@ -1398,11 +1410,12 @@ function sourceInitial(provider) {
 
 function signalLabel(key) {
   const labels = {
-    close: "收盘", open: "开盘", high: "最高", low: "最低", volume: "成交量", vol: "成交量",
-    pct_chg: "涨跌幅", change: "变动", oi: "持仓量", gdp_yoy: "GDP同比", cpi_yoy: "CPI同比",
-    ppi_yoy: "PPI同比", PMI010000: "制造业PMI", "制造业-指数": "制造业PMI",
-    "非制造业-指数": "非制造业PMI", "全国-同比增长": "CPI同比", "全国-环比增长": "CPI环比",
-    "当月同比增长": "PPI同比", "国内生产总值-同比增长": "GDP同比"
+    close: ui("收盘", "Close"), open: ui("开盘", "Open"), high: ui("最高", "High"), low: ui("最低", "Low"), volume: ui("成交量", "Volume"), vol: ui("成交量", "Volume"),
+    pct_chg: ui("涨跌幅", "Change"), change: ui("变动", "Change"), oi: ui("持仓量", "Open interest"), gdp_yoy: ui("GDP同比", "GDP YoY"), cpi_yoy: ui("CPI同比", "CPI YoY"),
+    ppi_yoy: ui("PPI同比", "PPI YoY"), PMI010000: ui("制造业PMI", "Manufacturing PMI"), "制造业-指数": ui("制造业PMI", "Manufacturing PMI"),
+    "非制造业-指数": ui("非制造业PMI", "Non-manufacturing PMI"), "全国-同比增长": ui("CPI同比", "CPI YoY"), "全国-环比增长": ui("CPI环比", "CPI MoM"),
+    "当月同比增长": ui("PPI同比", "PPI YoY"), "国内生产总值-同比增长": ui("GDP同比", "GDP YoY"),
+    dxy: "DXY", usd_cny: "USD/CNY", real_yield: ui("实际利率", "Real yield"), inventory: ui("库存", "Inventory"), holdings: ui("持仓", "Holdings")
   };
   return labels[key] || key;
 }
@@ -1440,6 +1453,58 @@ function nodeSourceSummary(nodeId, analysis = state.analysis) {
   return `来自 ${providers.join(" + ")} · ${items.length} 个数据集 · ${records} 条时点记录`;
 }
 
+function evidenceInspectorHtml(inventory, providerNames, providerDetail, analysis) {
+  const missingNodeIds = (analysis.execution_order || []).filter((nodeId) => {
+    const material = analysis.materials?.[nodeId] || {};
+    return !(material.ifind_bindings || []).some((binding) => binding?.status === "found" && !binding?.error && (binding?.records?.length || binding?.raw_text));
+  });
+  if (state.evidenceSelection.kind === "provider") {
+    const index = Math.max(0, Math.min(providerNames.length - 1, Number(state.evidenceSelection.index || 0)));
+    const provider = providerNames[index];
+    const detail = providerDetail[provider] || {};
+    const providerItems = inventory.filter((item) => item.provider === provider);
+    const calls = Number(detail.calls || providerItems.length);
+    const found = Number(detail.found || providerItems.length);
+    const errors = Array.isArray(detail.errors) ? detail.errors : [];
+    return `
+      <section class="evidence-inspector" aria-live="polite">
+        <header><div><span>${escapeHtml(sourceInitial(provider || "-"))}</span><strong>${escapeHtml(provider || ui("未选择数据源", "No provider selected"))}</strong></div><small>${ui("数据源诊断", "Provider diagnostics")}</small></header>
+        <div class="evidence-inspector-metrics">
+          <div><span>${ui("请求", "Calls")}</span><strong>${calls}</strong></div>
+          <div><span>${ui("成功", "Found")}</span><strong>${found}</strong></div>
+          <div><span>${ui("数据集", "Datasets")}</span><strong>${providerItems.length}</strong></div>
+          <div><span>${ui("错误", "Errors")}</span><strong>${errors.length}</strong></div>
+        </div>
+        <p>${errors.length ? escapeHtml(errors.slice(0, 3).join(" · ")) : ui("所有演示调用均返回可检查的时点记录。", "Every demo call returned inspectable point-in-time records.")}</p>
+      </section>`;
+  }
+  const index = Math.max(0, Math.min(inventory.length - 1, Number(state.evidenceSelection.index || 0)));
+  const binding = inventory[index];
+  if (!binding) return `<section class="evidence-inspector"><div class="evidence-empty">${ui("点击数据源或数据集查看详细血缘", "Select a provider or dataset to inspect its lineage")}</div></section>`;
+  const records = Array.isArray(binding.records) ? binding.records.slice(-6) : [];
+  const keys = [...new Set(records.flatMap((record) => Object.keys(record || {})))].filter((key) => !/^(id|create_|update_)/i.test(key)).slice(0, 6);
+  const recordTable = records.length ? `
+    <div class="evidence-record-table" role="table" aria-label="${ui("证据记录", "Evidence records")}">
+      <div class="evidence-record-row head" role="row">${keys.map((key) => `<span role="columnheader">${escapeHtml(signalLabel(key))}</span>`).join("")}</div>
+      ${records.map((record) => `<div class="evidence-record-row" role="row">${keys.map((key) => `<span role="cell">${escapeHtml(formatSignalValue(key, record?.[key] ?? "-"))}</span>`).join("")}</div>`).join("")}
+    </div>` : `<p>${escapeHtml(binding.raw_text || ui("无结构化记录", "No structured records"))}</p>`;
+  return `
+    <section class="evidence-inspector" aria-live="polite">
+      <header><div><span>${escapeHtml(sourceInitial(binding.provider))}</span><strong>${escapeHtml(binding.instrument)}</strong></div><small>${ui("可复核证据详情", "Inspectable evidence detail")}</small></header>
+      <div class="evidence-lineage-path">
+        <code>${escapeHtml(binding.provider)}</code><i>→</i><code>${escapeHtml(binding.endpoint)}</code><i>→</i><code>${escapeHtml(binding.stateLabels.join(" + "))}</code>
+      </div>
+      <div class="evidence-inspector-metrics">
+        <div><span>${ui("记录", "Records")}</span><strong>${records.length}</strong></div>
+        <div><span>${ui("状态", "States")}</span><strong>${binding.stateLabels.length}</strong></div>
+        <div><span>${ui("最新期", "Latest")}</span><strong>${escapeHtml(recordPeriod(latestEvidenceRecord(binding.records)) || "-")}</strong></div>
+        <div><span>${ui("缺口", "Gaps")}</span><strong>${missingNodeIds.length}</strong></div>
+      </div>
+      ${recordTable}
+      <footer><strong>${ui("覆盖审计", "Coverage audit")}</strong><span>${missingNodeIds.length ? escapeHtml(missingNodeIds.join(", ")) : ui("所有执行状态均已绑定至少一条可用记录。", "Every executed state has at least one usable bound record.")}</span></footer>
+    </section>`;
+}
+
 function renderEvidenceConsole(analysis, event) {
   const order = analysis.execution_order || [];
   const activeIndex = Math.max(0, order.indexOf(event.nodeId));
@@ -1456,43 +1521,43 @@ function renderEvidenceConsole(analysis, event) {
   const providerDetail = runtime.providers || {};
 
   els.primaryKicker.textContent = "Evidence Operations";
-  els.primaryTitle.textContent = "数据获取与证据血缘";
+  els.primaryTitle.textContent = ui("数据获取与证据血缘", "Data Retrieval and Evidence Lineage");
   els.copyReport.hidden = true;
   els.downloadReport.hidden = true;
-  els.reportProgress.textContent = `${activeIndex + 1} / ${order.length} 状态`;
+  els.reportProgress.textContent = `${activeIndex + 1} / ${order.length} ${ui("状态", "states")}`;
   els.reportMeta.innerHTML = [
-    `截止 ${analysis.date}`,
-    `${providerNames.length} 个数据源`,
-    `${inventory.length} 个数据集`,
-    "Point-in-time 已校验"
+    `${ui("截止", "Cutoff")} ${analysis.date}`,
+    `${providerNames.length} ${ui("个数据源", "providers")}`,
+    `${inventory.length} ${ui("个数据集", "datasets")}`,
+    ui("Point-in-time 已校验", "Point-in-time verified")
   ].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
 
-  const providerRows = providerNames.map((provider) => {
+  const providerRows = providerNames.map((provider, providerIndex) => {
     const detail = providerDetail[provider] || {};
     const errorCount = Array.isArray(detail.errors) ? detail.errors.length : 0;
-    const status = detail.status === "found" ? (errorCount ? "部分可用" : "已连接") : "待检查";
+    const status = detail.status === "found" ? (errorCount ? ui("部分可用", "Partial") : ui("已连接", "Connected")) : ui("待检查", "Pending") ;
     const calls = Number(detail.calls || inventory.filter((item) => item.provider === provider).length);
     const found = Number(detail.found || inventory.filter((item) => item.provider === provider).length);
     return `
-      <div class="source-health-row">
+      <button type="button" class="source-health-row ${state.evidenceSelection.kind === "provider" && Number(state.evidenceSelection.index) === providerIndex ? "selected" : ""}" data-evidence-kind="provider" data-evidence-index="${providerIndex}" aria-pressed="${state.evidenceSelection.kind === "provider" && Number(state.evidenceSelection.index) === providerIndex}">
         <span class="source-logo">${escapeHtml(sourceInitial(provider))}</span>
-        <div><strong>${escapeHtml(provider)}</strong><small>${escapeHtml(status)} · ${found}/${calls || found} 接口返回</small></div>
-        <span class="source-pulse ${errorCount ? "partial" : ""}">${errorCount ? `${errorCount} 项降级` : "Healthy"}</span>
-      </div>`;
+        <div><strong>${escapeHtml(provider)}</strong><small>${escapeHtml(status)} · ${found}/${calls || found} ${ui("接口返回", "calls returned")}</small></div>
+        <span class="source-pulse ${errorCount ? "partial" : ""}">${errorCount ? `${errorCount} ${ui("项降级", "degraded")}` : "Healthy"}</span>
+      </button>`;
   }).join("");
 
-  const datasetRows = inventory.map((binding) => {
+  const datasetRows = inventory.map((binding, bindingIndex) => {
     const period = recordPeriod(latestEvidenceRecord(binding.records)) || binding.queryDate || "-";
     const coverage = binding.stateLabels.slice(0, 2).join("、");
     const more = Math.max(0, binding.stateLabels.length - 2);
     return `
-      <div class="dataset-row ${binding.nodeIds.includes(event.nodeId) ? "active" : ""}">
+      <button type="button" class="dataset-row ${binding.nodeIds.includes(event.nodeId) ? "active" : ""} ${state.evidenceSelection.kind === "dataset" && Number(state.evidenceSelection.index) === bindingIndex ? "selected" : ""}" data-evidence-kind="dataset" data-evidence-index="${bindingIndex}" aria-pressed="${state.evidenceSelection.kind === "dataset" && Number(state.evidenceSelection.index) === bindingIndex}">
         <div class="dataset-source"><span>${escapeHtml(sourceInitial(binding.provider))}</span><strong>${escapeHtml(binding.instrument)}</strong></div>
         <div class="dataset-endpoint"><code>${escapeHtml(binding.endpoint)}</code><small>${escapeHtml(bindingSignals(binding))}</small></div>
-        <div class="dataset-period"><strong>${escapeHtml(period)}</strong><small>${Math.max(1, binding.records.length)} 条记录</small></div>
-        <div class="dataset-coverage"><strong>${escapeHtml(coverage || "当前状态")}${more ? ` +${more}` : ""}</strong><small>状态绑定</small></div>
-        <span class="dataset-status">证据已绑定</span>
-      </div>`;
+        <div class="dataset-period"><strong>${escapeHtml(period)}</strong><small>${Math.max(1, binding.records.length)} ${ui("条记录", "records")}</small></div>
+        <div class="dataset-coverage"><strong>${escapeHtml(coverage || ui("当前状态", "Current state"))}${more ? ` +${more}` : ""}</strong><small>${ui("状态绑定", "State binding")}</small></div>
+        <span class="dataset-status">${ui("查看详情", "Inspect")}</span>
+      </button>`;
   }).join("");
 
   els.reportPreview.className = "report-preview evidence-preview";
@@ -1503,20 +1568,21 @@ function renderEvidenceConsole(analysis, event) {
         <span class="lineage-cutoff">AS OF ${escapeHtml(analysis.date)}</span>
       </div>
       <div class="evidence-stats">
-        <div><span>连接数据源</span><strong>${providerNames.length}</strong><small>${escapeHtml(providerNames.join(" + ") || "待配置")}</small></div>
-        <div><span>已绑定数据集</span><strong>${inventory.length}</strong><small>接口级去重</small></div>
-        <div><span>时点记录</span><strong>${recordCount}</strong><small>纳入证据缓存</small></div>
-        <div><span>最新数据期</span><strong>${escapeHtml(latestPeriod)}</strong><small>发布日校验通过</small></div>
+        <div><span>${ui("连接数据源", "Connected Providers")}</span><strong>${providerNames.length}</strong><small>${escapeHtml(providerNames.join(" + ") || ui("待配置", "Pending"))}</small></div>
+        <div><span>${ui("已绑定数据集", "Bound Datasets")}</span><strong>${inventory.length}</strong><small>${ui("接口级去重", "Endpoint deduplicated")}</small></div>
+        <div><span>${ui("时点记录", "Point-in-time Records")}</span><strong>${recordCount}</strong><small>${ui("纳入证据缓存", "Cached for execution")}</small></div>
+        <div><span>${ui("最新数据期", "Latest Period")}</span><strong>${escapeHtml(latestPeriod)}</strong><small>${ui("发布日校验通过", "Release date verified")}</small></div>
       </div>
       <section class="source-registry">
-        <div class="evidence-section-heading"><div><span>01</span><strong>数据源连接</strong></div><small>Provider health</small></div>
+        <div class="evidence-section-heading"><div><span>01</span><strong>${ui("数据源连接", "Provider Connections")}</strong></div><small>Provider health</small></div>
         <div class="source-health-list">${providerRows || '<div class="evidence-empty">未获得可用数据源</div>'}</div>
       </section>
       <section class="dataset-registry">
-        <div class="evidence-section-heading"><div><span>02</span><strong>已获取数据</strong></div><small>${inventory.length} datasets · ${recordCount} records</small></div>
-        <div class="dataset-head"><span>来源 / 标的</span><span>接口 / 关键信号</span><span>数据期</span><span>覆盖状态</span><span>质量</span></div>
+        <div class="evidence-section-heading"><div><span>02</span><strong>${ui("已获取数据", "Retrieved Evidence")}</strong></div><small>${inventory.length} datasets · ${recordCount} records</small></div>
+        <div class="dataset-head"><span>${ui("来源 / 标的", "Source / Instrument")}</span><span>${ui("接口 / 关键信号", "Endpoint / Signals")}</span><span>${ui("数据期", "Period")}</span><span>${ui("覆盖状态", "State Coverage")}</span><span>${ui("质量", "Quality")}</span></div>
         <div class="dataset-list">${datasetRows || '<div class="evidence-empty">当前状态没有可用的提供方证据</div>'}</div>
       </section>
+      ${evidenceInspectorHtml(inventory, providerNames, providerDetail, analysis)}
     </div>`;
 }
 
@@ -1611,7 +1677,7 @@ function buildExecutionEvents(analysis) {
       stage: "subdfa",
       type: "finalized",
       graphScope: "subdfa",
-      title: "Query-Specific Sub-DFA 构建完成",
+      title: ui("Query-Specific Sub-DFA 构建完成", "Query-Specific Sub-DFA Ready"),
       subtitle: `${routeNodes.length} 个状态 · ${routeEdges.length} 条转移 · ${order.length} 个可执行写作状态`,
       activeNodes: routeNodes,
       activeEdges: routeEdges,
@@ -1689,7 +1755,7 @@ function currentEvent() {
 
 function evidenceSourceLabel(analysis = state.analysis) {
   const runtime = analysis?.runtime?.evidence || analysis?.runtime?.ifind || {};
-  if (runtime.mode === "demo-snapshot") return "内置演示证据";
+  if (runtime.mode === "demo-snapshot") return ui("内置演示证据", "Built-in Historical Demo Evidence");
   const providers = Array.isArray(runtime.providers_used) ? runtime.providers_used : [];
   if (runtime.status === "found" && Number(runtime.summary?.found || 0) > 0) {
     return `${providers.join(" + ") || analysis?.evidence_summary?.provider || "市场数据"} · 提供方证据可用`;
@@ -1894,7 +1960,9 @@ function renderSubDfaConstruction(analysis, event) {
   const detail = constructionStepDetail(analysis, event);
   const ready = event.type === "finalized";
   els.primaryKicker.textContent = "Query-Specific Execution";
-  els.primaryTitle.textContent = ready ? "Query-Specific Sub-DFA 已构建完成" : "Query-Specific Sub-DFA 构建过程";
+  els.primaryTitle.textContent = ready
+    ? ui("Query-Specific Sub-DFA 已构建完成", "Query-Specific Sub-DFA Ready")
+    : ui("Query-Specific Sub-DFA 构建过程", "Query-Specific Sub-DFA Construction");
   els.copyReport.hidden = true;
   els.downloadReport.hidden = true;
   els.reportProgress.textContent = `步骤 ${currentIndex + 1} / ${constructionEvents.length}`;
@@ -3184,6 +3252,35 @@ function graphRenderData(nodes, edges, event, routeNodes, routeEdges, activeNode
   };
 }
 
+function graphLayoutData(renderData) {
+  if (state.graphLayout === "auto" || !renderData.nodes.length) return renderData;
+  const orderedIds = topologicalNodeOrder(renderData.nodes.map((node) => node.id), renderData.edges);
+  const sourceById = Object.fromEntries(renderData.nodes.map((node) => [node.id, node]));
+  const left = 54;
+  const top = 48;
+  const gap = state.graphLayout === "horizontal" ? 72 : 36;
+  const nodes = orderedIds.filter((id) => sourceById[id]).map((id, index) => ({
+    ...sourceById[id],
+    x: state.graphLayout === "horizontal" ? left + index * (NODE_W + gap) : left,
+    y: state.graphLayout === "vertical" ? top + index * (NODE_H + gap) : top
+  }));
+  const width = state.graphLayout === "horizontal"
+    ? Math.max(560, left * 2 + nodes.length * NODE_W + Math.max(0, nodes.length - 1) * gap)
+    : Math.max(420, left * 2 + NODE_W);
+  const height = state.graphLayout === "vertical"
+    ? Math.max(340, top * 2 + nodes.length * NODE_H + Math.max(0, nodes.length - 1) * gap)
+    : Math.max(300, top * 2 + NODE_H);
+  return { ...renderData, nodes, viewport: [0, 0, width, height] };
+}
+
+function applyGraphDimensions(viewport) {
+  const baseWidth = Math.max(Number(viewport[2] || 0), els.graphShell.clientWidth);
+  const baseHeight = Math.max(Number(viewport[3] || 0), els.graphShell.clientHeight - 2);
+  els.svg.style.width = `${Math.round(baseWidth * state.graphZoom)}px`;
+  els.svg.style.height = `${Math.round(baseHeight * state.graphZoom)}px`;
+  els.graphZoomLabel.textContent = `${Math.round(state.graphZoom * 100)}%`;
+}
+
 function drawGraph() {
   els.svg.innerHTML = "";
   if (!state.analysis) {
@@ -3207,19 +3304,13 @@ function drawGraph() {
   const event = currentEvent() || {};
   const activeNodes = new Set(event.activeNodes || []);
   const activeEdges = new Set(event.activeEdges || []);
-  const renderData = graphRenderData(nodes, edges, event, routeNodes, routeEdges, activeNodes, activeEdges);
+  const renderData = graphLayoutData(graphRenderData(nodes, edges, event, routeNodes, routeEdges, activeNodes, activeEdges));
   const renderNodes = renderData.nodes;
   const renderEdges = renderData.edges;
   const viewport = renderData.viewport;
   els.svg.setAttribute("viewBox", viewport.join(" "));
   els.svg.setAttribute("preserveAspectRatio", "xMidYMin meet");
-  if (renderData.full) {
-    els.svg.style.width = `${Math.max(viewport[2], els.graphShell.clientWidth)}px`;
-    els.svg.style.height = `${Math.max(viewport[3], els.graphShell.clientHeight)}px`;
-  } else {
-    els.svg.style.width = `${Math.max(viewport[2], els.graphShell.clientWidth)}px`;
-    els.svg.style.height = `${Math.max(viewport[3], els.graphShell.clientHeight - 2)}px`;
-  }
+  applyGraphDimensions(viewport);
   const nodeById = Object.fromEntries(renderNodes.map((node) => [node.id, node]));
   const rankedById = Object.fromEntries((state.analysis.ranked || []).map((item) => [item.id, item]));
   const showFullGraph = renderData.full;
@@ -3507,6 +3598,9 @@ function resetWorkspace() {
   state.reportReady = false;
   state.revisions = [];
   state.expandedReportDfaKey = null;
+  state.evidenceSelection = { kind: "dataset", index: 0 };
+  state.graphZoom = 1;
+  setGraphLayout("auto");
   setGraphExpanded(false);
   els.currentTurn.classList.add("turn-hidden");
   els.emptyState.classList.remove("hidden");
@@ -3552,6 +3646,42 @@ function setGraphView(view) {
     item.classList.toggle("active", item.dataset.view === state.graphView);
   });
   if (state.analysis) drawGraph();
+}
+
+function setGraphLayout(layout) {
+  state.graphLayout = ["horizontal", "vertical"].includes(layout) ? layout : "auto";
+  document.querySelectorAll("[data-graph-layout]").forEach((button) => {
+    const active = button.dataset.graphLayout === state.graphLayout;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  state.graphZoom = 1;
+  if (state.analysis) drawGraph();
+}
+
+function setGraphZoom(value) {
+  state.graphZoom = Math.max(0.45, Math.min(2.2, Number(value || 1)));
+  if (state.analysis) drawGraph();
+  else els.graphZoomLabel.textContent = `${Math.round(state.graphZoom * 100)}%`;
+}
+
+function fitGraphToViewport() {
+  if (!state.analysis) return;
+  const { nodes, edges } = graphData();
+  const routeNodes = new Set(state.analysis.subdfa?.node_ids || state.analysis.execution_order || []);
+  const routeEdges = new Set(state.analysis.subdfa?.edge_ids || []);
+  const event = currentEvent() || {};
+  const activeNodes = new Set(event.activeNodes || []);
+  const activeEdges = new Set(event.activeEdges || []);
+  const renderData = graphLayoutData(graphRenderData(nodes, edges, event, routeNodes, routeEdges, activeNodes, activeEdges));
+  const availableWidth = Math.max(180, els.graphShell.clientWidth - 20);
+  const availableHeight = Math.max(160, els.graphShell.clientHeight - 20);
+  state.graphZoom = Math.max(0.45, Math.min(1.4, Math.min(
+    availableWidth / Math.max(1, Number(renderData.viewport[2])),
+    availableHeight / Math.max(1, Number(renderData.viewport[3]))
+  )));
+  drawGraph();
+  els.graphShell.scrollTo({ left: 0, top: 0, behavior: "smooth" });
 }
 
 function setGraphExpanded(expanded) {
@@ -3612,6 +3742,16 @@ function bindEvents() {
   els.composerRun.addEventListener("click", submitComposer);
   [els.reportPreview, els.revisionThread].forEach((container) => {
     container.addEventListener("click", (event) => {
+      const evidenceTarget = event.target.closest?.("[data-evidence-kind][data-evidence-index]");
+      if (evidenceTarget && container === els.reportPreview) {
+        state.evidenceSelection = {
+          kind: evidenceTarget.dataset.evidenceKind === "provider" ? "provider" : "dataset",
+          index: Number(evidenceTarget.dataset.evidenceIndex || 0)
+        };
+        const activeEvent = currentEvent();
+        if (state.analysis && activeEvent?.stage === "evidence") renderEvidenceConsole(state.analysis, activeEvent);
+        return;
+      }
       const target = event.target.closest?.(".report-section-main[data-report-dfa-key]");
       if (target) toggleReportInternalDfa(target);
     });
@@ -3792,6 +3932,12 @@ function bindEvents() {
       setGraphView(button.dataset.view);
     });
   });
+  document.querySelectorAll("[data-graph-layout]").forEach((button) => {
+    button.addEventListener("click", () => setGraphLayout(button.dataset.graphLayout));
+  });
+  els.graphZoomOut.addEventListener("click", () => setGraphZoom(state.graphZoom - 0.15));
+  els.graphZoomIn.addEventListener("click", () => setGraphZoom(state.graphZoom + 0.15));
+  els.graphFit.addEventListener("click", fitGraphToViewport);
   els.graphExpand.addEventListener("click", () => setGraphExpanded(!state.graphExpanded));
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;

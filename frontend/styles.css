@@ -1550,6 +1550,17 @@ html.capture-workflow-mode .composer-shell {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.source-health-row:hover,
+.source-health-row.selected {
+  border-color: #8dbeb4;
+  box-shadow: inset 3px 0 0 var(--teal);
+  background: #f4faf8;
 }
 
 .source-health-row > div {
@@ -1635,12 +1646,22 @@ html.capture-workflow-mode .composer-shell {
   border-bottom: 1px solid var(--line);
   border-left: 1px solid var(--line);
   background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .dataset-row.active {
   border-left: 3px solid var(--teal);
   padding-left: 8px;
   background: #f4faf8;
+}
+
+.dataset-row:hover,
+.dataset-row.selected {
+  border-color: #91bdb5;
+  background: #f0f8f6;
 }
 
 .dataset-source,
@@ -1713,6 +1734,162 @@ html.capture-workflow-mode .composer-shell {
   color: var(--muted);
   font-size: 10px;
   text-align: center;
+}
+
+.evidence-inspector {
+  margin: 16px 17px 18px;
+  padding: 14px;
+  border: 1px solid #a9c9c2;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #fbfdfc 0%, #eef7f5 100%);
+  box-shadow: 0 10px 28px rgb(25 61 53 / 8%);
+}
+
+.evidence-inspector > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 11px;
+}
+
+.evidence-inspector > header > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.evidence-inspector > header span:first-child {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  color: #fff;
+  background: var(--teal);
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.evidence-inspector > header strong {
+  font-size: 12px;
+}
+
+.evidence-inspector > header small,
+.evidence-inspector > footer span {
+  color: #68736f;
+  font-size: 9px;
+}
+
+.evidence-lineage-path {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 11px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border: 1px solid #d4e2de;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.evidence-lineage-path code {
+  color: #285d82;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.evidence-lineage-path i {
+  color: var(--teal);
+  font-style: normal;
+}
+
+.evidence-inspector-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 11px;
+  border: 1px solid #d4e2de;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.evidence-inspector-metrics > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-right: 1px solid #d4e2de;
+}
+
+.evidence-inspector-metrics > div:last-child {
+  border-right: 0;
+}
+
+.evidence-inspector-metrics span {
+  color: #74807c;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.evidence-inspector-metrics strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence-record-table {
+  overflow-x: auto;
+  border: 1px solid #d4e2de;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.evidence-record-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(92px, 1fr);
+  border-top: 1px solid #e4ece9;
+}
+
+.evidence-record-row:first-child {
+  border-top: 0;
+}
+
+.evidence-record-row span {
+  min-width: 0;
+  padding: 7px 8px;
+  overflow: hidden;
+  border-right: 1px solid #e4ece9;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence-record-row span:last-child {
+  border-right: 0;
+}
+
+.evidence-record-row.head {
+  color: #48635d;
+  background: #f1f6f4;
+  font-weight: 800;
+}
+
+.evidence-inspector > footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid #d4e2de;
+}
+
+.evidence-inspector > footer strong {
+  flex: 0 0 auto;
+  color: var(--teal);
+  font-size: 9px;
 }
 
 .loading-lines {
@@ -2009,6 +2186,34 @@ html.capture-workflow-mode .composer-shell {
   background: #fff;
 }
 
+.graph-inspection-tools,
+.graph-layout-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.graph-inspection-tools {
+  margin-left: auto;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.graph-layout-tabs {
+  padding-right: 4px;
+  border-right: 1px solid var(--line);
+}
+
+.graph-inspection-tools strong {
+  min-width: 39px;
+  color: #52605c;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 9px;
+  text-align: center;
+}
+
 .graph-toolbar button {
   min-height: 27px;
   padding: 0 10px;
@@ -2020,9 +2225,21 @@ html.capture-workflow-mode .composer-shell {
   font-weight: 700;
 }
 
-.graph-view-tabs button.active {
+.graph-view-tabs button.active,
+.graph-layout-tabs button.active {
   color: #fff;
   background: var(--ink);
+}
+
+.graph-inspection-tools > button:not(.graph-expand-button) {
+  min-width: 29px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+}
+
+.graph-inspection-tools > button:hover {
+  border-color: #b9c8c3;
+  background: var(--teal-soft);
 }
 
 .graph-toolbar .graph-expand-button {

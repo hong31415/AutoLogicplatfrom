@@ -175,15 +175,15 @@
               <span><b>06</b> 报告生成</span>
             </div>
             <div class="example-grid">
-              <button type="button" data-prompt="请生成一篇黄金市场研究周报，需要同时研究投资建议、行业观点、行情回顾、行业跟踪和风险提示。投资建议说明配置策略与关注标的；行业观点判断黄金和白银趋势及宏观驱动；行情回顾分析价格、成交和持仓表现；行业跟踪覆盖库存、矿端供给、下游需求及政策变化；风险提示说明利率、汇率、价格与流动性风险。" data-scope="黄金现货、COMEX 黄金与中国市场，兼顾白银及相关有色品种。" data-time-preset="complete-week" data-domain="precious_metals" data-fallback-top-k="5">
+              <button type="button" data-prompt="请为投资研究读者生成一篇黄金及相关贵金属周度分析，解释指定时间内的市场变化，以及这些变化对投资仓位和下行风险的影响。请由系统依据历史写作逻辑与可用证据决定报告结构。" data-scope="黄金现货、COMEX 黄金与中国市场，兼顾白银及相关有色品种。" data-time-preset="complete-week" data-domain="precious_metals" data-fallback-top-k="5">
                 <span>黄金周报</span>
                 <small>多状态 · 深度周报</small>
               </button>
-              <button type="button" data-prompt="请生成一篇有色金属行业跟踪报告，需要同时研究投资建议、行业观点、行情回顾、行业跟踪和风险提示。投资建议给出铜铝及贵金属的配置方向和关注标的；行业观点比较基本金属、贵金属、小金属和新能源金属的板块景气，判断铜铝供需、黄金价格及行业配置顺序；行情回顾分析铜铝和贵金属价格、成交及持仓；行业跟踪覆盖库存、冶炼供给、进口、加工和下游开工需求；风险提示说明供需、利率汇率、价格和政策风险。" data-scope="铜、铝产业链，兼顾贵金属、小金属和新能源金属。" data-time-preset="complete-week" data-domain="precious_metals" data-fallback-top-k="5">
+              <button type="button" data-prompt="请为投资研究读者生成一篇有色金属行业跟踪报告，判断指定时间内产业链与市场环境的主要变化，并说明这些变化对配置决策和下行风险的影响。请由系统依据历史写作逻辑与可用证据决定报告结构。" data-scope="铜、铝产业链，兼顾贵金属、小金属和新能源金属。" data-time-preset="complete-week" data-domain="precious_metals" data-fallback-top-k="5">
                 <span>有色金属跟踪</span>
                 <small>多状态 · 铜铝供需</small>
               </button>
-              <button type="button" data-prompt="请生成一篇宏观专题报告：结合高频数据观察制造业与工业景气、房地产、消费和投资内需、出口外需以及 CPI/PPI 价格变化，分析美元、利率与政策传导，并给出增长判断和风险提示。" data-scope="全球宏观变量与中国经济，关注对大宗商品的影响。" data-time-preset="complete-data-month" data-domain="macro" data-fallback-top-k="7">
+              <button type="button" data-prompt="请为投资研究读者生成一篇宏观专题报告，判断指定时间内宏观环境的主要变化，以及这些变化对增长预期、大宗商品配置和下行风险的影响。请由系统依据历史写作逻辑与可用证据决定报告结构。" data-scope="全球宏观变量与中国经济，关注对大宗商品的影响。" data-time-preset="complete-data-month" data-domain="macro" data-fallback-top-k="7">
                 <span>宏观专题</span>
                 <small>全链路 · 宏观专题</small>
               </button>
@@ -319,6 +319,10 @@
                   <input id="timeRangeInput" type="text" autocomplete="off" placeholder="如：2025-06-02 至 2025-06-08" />
                   <select id="timeRangePresetSelect" aria-label="选择时间示例"><option value="">选择示例</option></select>
                 </div>
+              </label>
+              <label class="state-constraints-field">
+                <span>写作状态约束（可选）</span>
+                <input id="stateConstraintsInput" type="text" autocomplete="off" placeholder="如：风险提示；留空则由 DFA 根据查询与证据选择 writing states" />
               </label>
             </div>
             <textarea id="queryInput" rows="1" spellcheck="false" placeholder="输入报告主题、目标读者和关注重点"></textarea>
@@ -562,8 +566,8 @@
       <p class="my-dfa-note">用户 DFA 保存在当前浏览器本机存储中；系统原始全局写作 DFA 始终保持只读并可重新导入。</p>
     </dialog>
 
-    <script src="./pages-demo.js?v=20260826dfa"></script>
-    <script src="./i18n.js?v=20260827final6"></script>
-    <script src="./app.js?v=20260827final6"></script>
+    <script src="./pages-demo.js?v=20260831constraints"></script>
+    <script src="./i18n.js?v=20260831constraints"></script>
+    <script src="./app.js?v=20260831constraints"></script>
   </body>
 </html>

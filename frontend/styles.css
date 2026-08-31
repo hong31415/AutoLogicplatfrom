@@ -3129,6 +3129,15 @@ body.graph-overlay-open {
 .composer-fields input::placeholder { color: #959d99; }
 .composer textarea { font-size: 15px; }
 
+.composer-fields .state-constraints-field {
+  grid-column: 1 / -1;
+  grid-template-columns: 148px minmax(0, 1fr);
+}
+
+.composer-fields .state-constraints-field span {
+  color: #4d6660;
+}
+
 .time-range-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3508,6 +3517,7 @@ body.graph-overlay-open {
 @media (max-width: 680px) {
   .research-image { height: 190px; margin-bottom: 21px; }
   .composer-fields { grid-template-columns: 1fr; gap: 6px; }
+  .composer-fields .state-constraints-field { grid-column: auto; grid-template-columns: 126px minmax(0, 1fr); }
   .composer-threshold-control > summary small { display: none; }
   .composer-dfa-source-control > summary small { display: none; }
   .composer-dfa-source-popover { left: -58px; width: min(360px, calc(100vw - 28px)); }

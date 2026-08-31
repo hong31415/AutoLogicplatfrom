@@ -108,7 +108,7 @@ def rank_states_by_similarity(
 
 
 def apply_query_label_boost(query: str, ranked_states: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Preserve explicit section requests even when a fallback embedding is weak."""
+    """Preserve optional user-specified writing states when fallback embeddings are weak."""
     compact_query = "".join(str(query or "").lower().split())
     boosted: List[Dict[str, Any]] = []
     for item in ranked_states:

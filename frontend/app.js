@@ -241,6 +241,7 @@ const els = {
   addMyDfaEdge: document.getElementById("addMyDfaEdgeButton"),
   scope: document.getElementById("scopeInput"),
   timeRange: document.getElementById("timeRangeInput"),
+  stateConstraints: document.getElementById("stateConstraintsInput"),
   timeRangePreset: document.getElementById("timeRangePresetSelect"),
   composer: document.getElementById("mainComposer"),
   composerFields: document.getElementById("composerFields"),
@@ -1068,10 +1069,14 @@ function composeQuery() {
   const request = els.query.value.trim();
   const scope = els.scope.value.trim();
   const timeRange = els.timeRange.value.trim();
+  const stateConstraints = els.stateConstraints.value.trim();
   return [
     request,
     scope ? `${state.language === "en" ? "Research scope" : "需求范围"}：${scope}` : "",
-    timeRange ? `${state.language === "en" ? "Time range" : "时间范围"}：${timeRange}` : ""
+    timeRange ? `${state.language === "en" ? "Time range" : "时间范围"}：${timeRange}` : "",
+    stateConstraints
+      ? `${state.language === "en" ? "Optional writing-state constraints" : "可选写作状态约束"}：${stateConstraints}`
+      : ""
   ].filter(Boolean).join("\n");
 }
 
@@ -1261,6 +1266,7 @@ function beginRun(query) {
   els.query.value = "";
   els.scope.value = "";
   els.timeRange.value = "";
+  els.stateConstraints.value = "";
   autoResizeComposer();
   renderRevisionThread();
   updateComposerMode();
@@ -3608,6 +3614,7 @@ function resetWorkspace() {
   els.query.value = "";
   els.scope.value = "";
   els.timeRange.value = "";
+  els.stateConstraints.value = "";
   autoResizeComposer();
   renderRevisionThread();
   updateComposerMode();
@@ -3900,15 +3907,15 @@ function bindEvents() {
   els.addMyDfaEdge.addEventListener("click", addMyDfaEdge);
   const englishExamples = [
     {
-      prompt: "Generate a gold market research weekly covering investment recommendations, industry views, market performance, industry tracking, and risk factors. Explain allocation strategy and instruments; assess gold and silver trends and macro drivers; review price, volume, and positioning; track inventories, mine supply, downstream demand, and policy changes; and identify rate, FX, price, and liquidity risks.",
+      prompt: "Generate a weekly analysis of gold and related precious metals for investment-research readers. Explain the market changes during the specified period and their implications for positioning and downside exposure. Let the system determine the report structure from the learned writing logic and available evidence.",
       scope: "Spot gold, COMEX gold, and the Chinese market, with silver and related non-ferrous metals"
     },
     {
-      prompt: "Generate a base-metals industry tracking report covering investment recommendations, industry views, market performance, industry tracking, and risk factors. Compare copper, aluminum, precious metals, minor metals, and energy-transition metals, and assess supply-demand, inventories, smelting, imports, processing, and downstream operating rates.",
+      prompt: "Generate a base-metals industry tracking report for investment-research readers. Identify the main changes in the value chain and market environment during the specified period, and explain their implications for allocation decisions and downside exposure. Let the system determine the report structure from the learned writing logic and available evidence.",
       scope: "Copper and aluminum value chains, with precious, minor, and energy-transition metals"
     },
     {
-      prompt: "Generate a macro research report using high-frequency evidence on manufacturing and industrial activity, real estate, consumption and investment, exports, CPI/PPI, the US dollar, interest rates, and policy transmission. Provide a growth assessment and explicit risk factors.",
+      prompt: "Generate a macro research report for investment-research readers. Identify the main changes in the macro environment during the specified period and explain their implications for growth expectations, commodity allocation, and downside exposure. Let the system determine the report structure from the learned writing logic and available evidence.",
       scope: "Global macro variables and the Chinese economy, focusing on their impact on commodities"
     }
   ];
@@ -3917,6 +3924,7 @@ function bindEvents() {
       const localizedExample = state.language === "en" ? englishExamples[index] : null;
       els.query.value = localizedExample?.prompt || button.dataset.prompt || "";
       els.scope.value = localizedExample?.scope || button.dataset.scope || "";
+      els.stateConstraints.value = button.dataset.stateConstraints || "";
       els.timeRange.value = button.dataset.timePreset
         ? resolveTimePreset(button.dataset.timePreset)
         : button.dataset.time || "";

@@ -9,6 +9,7 @@ AutoLogic Studio is a bilingual, evidence-driven research report workspace. It i
 - User-created and editable DFAs
 - Upload-driven DFA induction for TXT, Markdown, CSV, JSON, HTML, DOCX, PPTX, XLSX, and PDF templates, with live progress, classified storage, preview, reuse, and editable copies
 - Query parsing, semantic state matching, Query-Specific Sub-DFA construction, evidence binding, and report assembly traces
+- Optional writing-state constraints: leave the field blank for DFA-driven state selection, or name required writing states when a fixed structure is genuinely needed
 - DeepSeek-compatible report generation and configurable embedding providers
 - AkShare, Tushare, optional iFinD, and optional MySQL integrations
 - Markdown report download and version-preserving report revision

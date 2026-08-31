@@ -52,6 +52,8 @@
     "宏观专题": "Macro Research",
     "需求范围": "Research Scope",
     "时间范围": "Time Range",
+    "写作状态约束（可选）": "Writing-State Constraints (Optional)",
+    "如：风险提示；留空则由 DFA 根据查询与证据选择 writing states": "e.g. Risk Factors; leave blank for the DFA to select writing states from the query and evidence",
     "选择示例": "Select Example",
     "证据驱动": "Evidence Driven",
     "系统写作 DFA": "System Writing DFA",

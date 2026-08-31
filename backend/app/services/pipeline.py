@@ -457,14 +457,44 @@ def ensure_user_dfa_artifacts(
     }
 
 
+DOMAIN_SIGNAL_PATTERNS: dict[str, tuple[tuple[str, int], ...]] = {
+    # Domain anchors carry more weight than generic words such as
+    # "tracking" or "positioning". This prevents a precious-metals query
+    # from being classified as ETF merely because it asks for industry tracking.
+    "precious_metals": (
+        (r"\b(?:gold|silver|comex|precious\s+metals|non[- ]ferrous|copper|aluminum|aluminium)\b|黄金|白银|贵金属|有色|铜|铝", 4),
+        (r"\bmetal(?:s)?\b|金属", 1),
+    ),
+    "etf": (
+        (r"\b(?:ETF|fund|index)\b|基金|指数", 5),
+        (r"\b(?:tracking|holding|holdings|valuation|turnover)\b|跟踪误差|资金流|持仓", 1),
+    ),
+    "macro": (
+        (r"\b(?:macro|GDP|CPI|PMI|inflation|employment|fiscal|monetary)\b|宏观|经济|通胀|就业|财政|货币|社融|地产|内需|外需", 4),
+    ),
+    "cotton": ((r"\bcotton\b|棉花|棉纱|纺织|郑棉", 4),),
+    "agriculture": ((r"\b(?:agriculture|soybean|corn|hog|grain)\b|农产品|大豆|玉米|生猪|粮食", 4),),
+}
+
+
+def _domain_signal_score(query: str, key: str) -> int:
+    return sum(
+        weight * len(re.findall(pattern, query, flags=re.I))
+        for pattern, weight in DOMAIN_SIGNAL_PATTERNS.get(key, ())
+    )
+
+
 def select_domain(query: str, override: str = "") -> tuple[str, dict[str, Any]]:
     override = override.strip().lower()
-    if override and override in DOMAIN_SPECS:
+    if override and override not in {"auto", "automatic", "自动识别"} and override in DOMAIN_SPECS:
         return override, DOMAIN_SPECS[override]
-    for key in ("etf", "precious_metals", "cotton", "agriculture", "macro"):
-        spec = DOMAIN_SPECS[key]
-        if re.search(spec["match"], query, flags=re.I):
-            return key, spec
+    # Use explicit anchors first and only fall back to the generic domain
+    # matcher when no scored signal is present. Ties retain this stable order.
+    candidates = ("precious_metals", "etf", "macro", "cotton", "agriculture")
+    scores = {key: _domain_signal_score(query, key) for key in candidates}
+    best_key = max(candidates, key=lambda key: scores[key])
+    if scores[best_key] > 0:
+        return best_key, DOMAIN_SPECS[best_key]
     return "general", GENERAL_SPEC
 
 

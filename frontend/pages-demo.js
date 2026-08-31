@@ -74,10 +74,20 @@
     const requested = String(payload.custom_dfa?.baseDomain || payload.domain || "").toLowerCase();
     if (DOMAIN_DEFINITIONS[requested]) return requested;
     const query = String(payload.query || "");
-    if (/ETF|基金|指数/i.test(query)) return "etf";
-    if (/棉花|棉纺|棉纱/.test(query)) return "cotton";
-    if (/农产品|大豆|玉米|生猪|粮食/.test(query)) return "agriculture";
-    if (/宏观|制造业|房地产|CPI|PPI|出口/.test(query)) return "macro";
+    const score = (patterns) => patterns.reduce((total, [pattern, weight]) => {
+      const matches = query.match(pattern);
+      return total + (matches ? matches.length * weight : 0);
+    }, 0);
+    const scores = {
+      precious_metals: score([[/\b(?:gold|silver|comex|precious\s+metals|non[- ]ferrous|copper|aluminum|aluminium)\b|黄金|白银|贵金属|有色|铜|铝/gi, 4], [/\bmetal(?:s)?\b|金属/gi, 1]]),
+      etf: score([[/\b(?:ETF|fund|index)\b|基金|指数/gi, 5], [/\b(?:tracking|holding|holdings|valuation|turnover)\b|跟踪误差|资金流|持仓/gi, 1]]),
+      macro: score([[/\b(?:macro|GDP|CPI|PMI|inflation|employment|fiscal|monetary)\b|宏观|经济|通胀|就业|财政|货币|社融|地产|内需|外需/gi, 4]]),
+      cotton: score([[/\bcotton\b|棉花|棉纺|棉纱/gi, 4]]),
+      agriculture: score([[/\b(?:agriculture|soybean|corn|hog|grain)\b|农产品|大豆|玉米|生猪|粮食/gi, 4]])
+    };
+    const ranked = ["precious_metals", "etf", "macro", "cotton", "agriculture"]
+      .sort((a, b) => scores[b] - scores[a]);
+    if (scores[ranked[0]] > 0) return ranked[0];
     return "precious_metals";
   }
 

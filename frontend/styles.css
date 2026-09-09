@@ -3098,13 +3098,43 @@ body.graph-overlay-open {
   height: 280px;
   margin: 0 0 28px;
   overflow: hidden;
-  border: 1px solid #d7dfe8;
+  border: 1px solid #d8d3c5;
   border-radius: 12px;
-  background: #eaf5ff;
-  box-shadow: var(--shadow);
+  background: #f4efe3;
+  box-shadow: 0 18px 44px rgba(43, 55, 49, .14);
 }
 
-.research-image img { width: 100%; height: 100%; object-fit: cover; object-position: center 44%; }
+.research-image img { width: 100%; height: 100%; object-fit: cover; object-position: center 50%; }
+
+.research-cover-copy {
+  position: absolute;
+  inset: 18px 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  color: #173d39;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .92);
+  pointer-events: none;
+}
+
+.research-cover-copy strong {
+  padding-right: 13px;
+  border-right: 1px solid rgba(23, 61, 57, .28);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+.research-cover-copy span {
+  color: #4f665f;
+  font-family: "Times New Roman", serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .025em;
+}
 
 .composer-fields {
   display: grid;

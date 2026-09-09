@@ -6,9 +6,52 @@
     <meta name="color-scheme" content="light" />
     <meta name="google" content="notranslate" />
     <title>AutoLogic Studio</title>
-    <link rel="stylesheet" href="./styles.css?v=20260909cover" />
+    <link rel="stylesheet" href="./styles.css?v=20260909landing" />
   </head>
-  <body>
+  <body class="landing-active">
+    <section id="landingCover" class="landing-cover" aria-labelledby="landingTitle">
+      <header class="landing-header">
+        <div class="landing-brand">
+          <img src="./assets/autologic-studio-mark-light.png?v=20260802a" width="52" height="52" alt="" aria-hidden="true" />
+          <div>
+            <strong>AutoLogic Studio</strong>
+            <span>Writing Intelligence</span>
+          </div>
+        </div>
+        <span class="landing-venue">AAAI-27 Demo</span>
+      </header>
+
+      <div class="landing-content">
+        <div class="landing-copy">
+          <p class="landing-kicker">Logic-Driven Document Generation</p>
+          <h1 id="landingTitle">Evidence Determines the Next Writing State</h1>
+          <p class="landing-summary">Learn reusable writing logic from historical professional documents, then execute it with evidence through a Global Writing DFA and a Query-Specific Sub-DFA.</p>
+          <div class="landing-terms" aria-label="AutoLogic core components">
+            <span>Global Writing DFA</span>
+            <span>Query-Specific Sub-DFA</span>
+            <span>State-Level Evidence</span>
+          </div>
+          <button id="enterStudioButton" class="enter-studio-button" type="button">
+            <span>Enter AutoLogic Studio</span>
+            <small>进入系统</small>
+            <b aria-hidden="true">→</b>
+          </button>
+        </div>
+
+        <figure class="landing-visual">
+          <img src="./assets/autologic-writing-dfa-hero-v2.webp?v=20260909a" alt="Historical professional documents and evidence pass through a writing DFA to produce a structured document" />
+        </figure>
+      </div>
+
+      <footer class="landing-footer">
+        <span>Historical Professional Documents</span>
+        <i aria-hidden="true"></i>
+        <span>Transition Conditions</span>
+        <i aria-hidden="true"></i>
+        <span>Long-Document Generation</span>
+      </footer>
+    </section>
+
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
@@ -155,13 +198,6 @@
 
         <section id="conversationScroll" class="conversation-scroll">
           <section id="emptyState" class="empty-state">
-            <div class="research-image" role="img" aria-label="AutoLogic Studio 证据条件驱动的写作 DFA">
-              <img src="./assets/autologic-writing-dfa-hero-v2.webp?v=20260909a" alt="历史专业文档与证据经由写作 DFA 生成结构化文档" />
-              <div class="research-cover-copy" aria-hidden="true">
-                <strong>AutoLogic Studio</strong>
-                <span>Evidence Determines the Next Writing State</span>
-              </div>
-            </div>
             <img class="empty-mark" src="./assets/autologic-studio-mark-light.png?v=20260802a" alt="" aria-hidden="true" />
             <p class="empty-kicker">AutoLogic Studio</p>
             <h2>让证据决定报告的下一步</h2>
@@ -573,5 +609,20 @@
     <script src="./pages-demo.js?v=20260831constraints"></script>
     <script src="./i18n.js?v=20260831constraints"></script>
     <script src="./app.js?v=20260831constraints"></script>
+    <script>
+      (() => {
+        const cover = document.getElementById("landingCover");
+        const enterButton = document.getElementById("enterStudioButton");
+        if (!cover || !enterButton) return;
+        enterButton.addEventListener("click", () => {
+          cover.classList.add("is-leaving");
+          document.body.classList.remove("landing-active");
+          window.setTimeout(() => {
+            cover.hidden = true;
+            document.getElementById("queryInput")?.focus({ preventScroll: true });
+          }, 420);
+        });
+      })();
+    </script>
   </body>
 </html>

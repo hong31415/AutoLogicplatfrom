@@ -38,26 +38,6 @@ body.landing-active {
   transition: opacity .36s ease, transform .42s cubic-bezier(.22, 1, .36, 1);
 }
 
-.landing-cover::before,
-.landing-cover::after {
-  position: absolute;
-  inset: 0;
-  content: "";
-  pointer-events: none;
-}
-
-.landing-cover::before {
-  inset: -28px;
-  background: url("./assets/autologic-entry-cover-16x9-4k.png?v=20260909a") center / cover no-repeat;
-  filter: blur(22px);
-  opacity: .22;
-  transform: scale(1.06);
-}
-
-.landing-cover::after {
-  background: rgba(244, 240, 233, .56);
-}
-
 .landing-cover[hidden] {
   display: none;
 }

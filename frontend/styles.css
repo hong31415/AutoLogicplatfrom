@@ -48,7 +48,7 @@ body.landing-active {
 
 .landing-cover::before {
   inset: -28px;
-  background: url("./assets/autologic-entry-cover-v3.png?v=20260909a") center / cover no-repeat;
+  background: url("./assets/autologic-entry-cover-16x9-4k.png?v=20260909a") center / cover no-repeat;
   filter: blur(22px);
   opacity: .22;
   transform: scale(1.06);
@@ -86,7 +86,7 @@ body.landing-active {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   filter: drop-shadow(0 14px 32px rgba(45, 42, 35, .14));
 }

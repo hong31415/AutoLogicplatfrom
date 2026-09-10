@@ -32,7 +32,7 @@ function Stop-RecordedProcess([string]$pidFile) {
 function Assert-PortFree([int]$port) {
     $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($listener) {
-        throw "Port $port is already in use by process $($listener.OwningProcess). Run 关闭网站.bat first, then retry."
+        throw "Port $port is already in use by process $($listener.OwningProcess). Run stop_website.bat first, then retry."
     }
 }
 
@@ -111,4 +111,4 @@ Write-Host "AutoLogic Studio is running." -ForegroundColor Green
 Write-Host "Website: $url"
 Write-Host "Backend: http://127.0.0.1:$backendPort/api/v1/health"
 Write-Host "Frontend API proxy: connected"
-Write-Host "Use 关闭网站.bat to stop both services."
+Write-Host "Use stop_website.bat to stop both services."

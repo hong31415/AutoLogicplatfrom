@@ -14,6 +14,7 @@ const COMPOSER_DFA_STORAGE_KEY = "autologic-composer-dfa-v1";
 const IS_GITHUB_PAGES = (
   window.location.hostname.endsWith(".github.io")
   || window.location.hostname === "anonymous.4open.science"
+  || window.location.hostname.endsWith(".4open.science")
   || window.location.protocol === "file:"
 );
 const NODE_W = 208;
@@ -22,6 +23,10 @@ const NODE_H = 78;
 // runtime-generated cards in English even if a cached browser tab evaluates
 // app.js before window.AutoLogicI18n is reattached during a hard navigation.
 const IS_ENGLISH = (
+  window.location.hostname.endsWith(".github.io")
+  || window.location.hostname === "anonymous.4open.science"
+  || window.location.hostname.endsWith(".4open.science")
+  ||
   window.AutoLogicI18n?.language === "en"
   || document.documentElement.lang === "en"
   || localStorage.getItem("autologic-language-v1") === "en"
@@ -630,7 +635,7 @@ async function apiPost(path, payload) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || `请求失败 (${response.status})`);
+    throw new Error(data.error || ui(`请求失败 (${response.status})`, `Request failed (${response.status})`));
   }
   return data;
 }
@@ -643,7 +648,7 @@ async function apiGet(path) {
   const response = await fetch(`${API_BASE}${path}`);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || `请求失败 (${response.status})`);
+    throw new Error(data.error || ui(`请求失败 (${response.status})`, `Request failed (${response.status})`));
   }
   return data;
 }
@@ -671,7 +676,7 @@ function renderUploadFileList() {
       <div><strong>${escapeHtml(file.name)}</strong><small>${formatBytes(file.size)} · ${escapeHtml(file.type || "模板文件")}</small></div>
       <button type="button" data-upload-file-remove="${index}" title="移除文件" aria-label="移除 ${escapeHtml(file.name)}">×</button>
     </article>
-  `).join("") : '<div class="upload-file-empty">尚未选择模板文件</div>';
+  `).join("") : `<div class="upload-file-empty">${ui("尚未选择模板文件", "No template files selected")}</div>`;
   els.startUploadDfaBuild.disabled = !state.uploadFiles.length || Boolean(state.uploadBuildJobId);
 }
 
@@ -715,7 +720,7 @@ async function loadUploadedDfaLibrary() {
     renderComposerDfaOptions();
     renderUploadedDfaLibrary();
   } catch (error) {
-    if (els.uploadDfaLibrary) els.uploadDfaLibrary.innerHTML = `<div class="upload-library-empty">无法读取模板库：${escapeHtml(error.message)}</div>`;
+    if (els.uploadDfaLibrary) els.uploadDfaLibrary.innerHTML = `<div class="upload-library-empty">${ui("无法读取模板库", "Unable to load the template library")}: ${escapeHtml(error.message)}</div>`;
   }
 }
 
@@ -726,7 +731,9 @@ function renderUploadedDfaLibrary() {
     (domain === "all" || dfa.baseDomain === domain)
     && (!search || `${dfa.name} ${dfa.category}`.toLowerCase().includes(search))
   ));
-  els.uploadDfaLibraryCount.textContent = `${state.uploadedDfas.length} 个已构建 DFA`;
+  els.uploadDfaLibraryCount.textContent = IS_ENGLISH
+    ? `${state.uploadedDfas.length} built DFAs`
+    : `${state.uploadedDfas.length} 个已构建 DFA`;
   if (!items.length) {
     els.uploadDfaLibrary.innerHTML = '<div class="upload-library-empty">没有符合当前筛选条件的模板 DFA。</div>';
     return;
@@ -1033,10 +1040,10 @@ async function checkApi() {
   } catch (_error) {
     state.health = null;
     els.runtimeDot.className = "runtime-dot error";
-    els.runtimeStatus.textContent = "后端未连接";
-    if (!state.analysis) els.dfaRuntime.textContent = "等待连接";
+    els.runtimeStatus.textContent = ui("后端未连接", "Backend Disconnected");
+    if (!state.analysis) els.dfaRuntime.textContent = ui("等待连接", "Waiting for Connection");
     els.modelRuntime.textContent = "-";
-    els.apiStatus.textContent = "API 离线";
+    els.apiStatus.textContent = ui("API 离线", "API Offline");
     els.apiStatus.classList.add("error");
   } finally {
     state.healthCheckInFlight = false;
@@ -1225,11 +1232,11 @@ function startReportGenerationClock() {
   state.reportGenerationStartedAt = Date.now();
   const update = () => {
     const seconds = Math.max(1, Math.round((Date.now() - state.reportGenerationStartedAt) / 1000));
-    els.runTitle.textContent = "正在调用模型生成报告";
-    els.runSubtitle.textContent = `报告生成中 · 已等待 ${seconds}s`;
-    els.runBadge.textContent = "生成中";
+    els.runTitle.textContent = ui("正在调用模型生成报告", "Generating the report with the model");
+    els.runSubtitle.textContent = IS_ENGLISH ? `Generating report · elapsed ${seconds}s` : `报告生成中 · 已等待 ${seconds}s`;
+    els.runBadge.textContent = ui("生成中", "Generating");
     els.runBadge.className = "run-badge running";
-    els.apiStatus.textContent = `正在调用模型生成报告 · ${seconds}s`;
+    els.apiStatus.textContent = IS_ENGLISH ? `Calling the model to generate the report · ${seconds}s` : `正在调用模型生成报告 · ${seconds}s`;
     els.apiStatus.classList.remove("error");
   };
   update();
@@ -1270,10 +1277,12 @@ function beginRun(query) {
   autoResizeComposer();
   renderRevisionThread();
   updateComposerMode();
-  els.runTitle.textContent = "正在启动 AutoLogic";
+  els.runTitle.textContent = ui("正在启动 AutoLogic", "Starting AutoLogic");
   const customDfa = selectedComposerDfa();
-  els.runSubtitle.textContent = customDfa ? `载入我的 DFA · ${customDfa.name || "自定义结构"}` : "载入系统全局写作 DFA";
-  els.runBadge.textContent = "运行中";
+  els.runSubtitle.textContent = customDfa
+    ? ui(`载入我的 DFA · ${customDfa.name || "自定义结构"}`, `Loading My DFA · ${customDfa.name || "Custom Structure"}`)
+    : ui("载入系统全局写作 DFA", "Loading the system Global Writing DFA");
+  els.runBadge.textContent = ui("运行中", "Running");
   els.runBadge.className = "run-badge running";
   els.skipAnimation.disabled = true;
   renderPending();
@@ -1283,18 +1292,18 @@ function beginRun(query) {
 
 function renderPending() {
   renderStageRail("dfa", []);
-  els.reportProgress.textContent = "等待生成";
+  els.reportProgress.textContent = ui("等待生成", "Waiting");
   els.reportMeta.innerHTML = "";
   els.reportPreview.className = "report-preview is-loading";
   els.reportPreview.innerHTML = '<div class="loading-lines"><i></i><i></i><i></i><i></i></div>';
   els.traceCounter.textContent = "0 / 0";
   els.decisionIndex.textContent = "S0";
-  els.decisionContextLabel.textContent = "当前构建对象";
-  els.decisionTitle.textContent = "初始化全局写作 DFA";
-  els.evidenceLabel.textContent = "构建依据";
-  els.evidenceText.textContent = "等待解析用户对话";
-  els.conditionLabel.textContent = "当前产出";
-  els.conditionText.textContent = "等待构建本次 Query-Specific Sub-DFA";
+  els.decisionContextLabel.textContent = ui("当前构建对象", "Current construction object");
+  els.decisionTitle.textContent = ui("初始化全局写作 DFA", "Initialize the Global Writing DFA");
+  els.evidenceLabel.textContent = ui("构建依据", "Construction basis");
+  els.evidenceText.textContent = ui("等待解析用户对话", "Waiting to parse the request");
+  els.conditionLabel.textContent = ui("当前产出", "Current output");
+  els.conditionText.textContent = ui("等待构建本次 Query-Specific Sub-DFA", "Waiting to build this Query-Specific Sub-DFA");
   els.eventTimeline.innerHTML = "";
   els.runDetailGrid.innerHTML = "";
   drawGraph();
@@ -1315,9 +1324,9 @@ function findTransition(sourceId, targetId) {
 }
 
 function conditionForEdge(edge) {
-  if (!edge) return "达到终止状态 F";
+  if (!edge) return ui("达到终止状态 F", "Reach terminal state F");
   if (edge.condition_label) return edge.condition_label;
-  if (edge.direct) return "唯一稳定后继，直接转移";
+  if (edge.direct) return ui("唯一稳定后继，直接转移", "Only stable successor; direct transition");
   return edge.label || `${edge.source} → ${edge.target}`;
 }
 
@@ -1337,6 +1346,22 @@ function materialSummary(nodeId) {
     "iFinD enabled but no binding"
   ];
   const usefulFacts = facts.filter((fact) => !internalMarkers.some((marker) => String(fact).includes(marker)));
+  if (IS_ENGLISH) {
+    const parts = verified.slice(0, 2).map((binding) => {
+      const inst = binding.instrument || binding.state_label || nodeId;
+      const rec = latestEvidenceRecord(binding.records);
+      if (rec) {
+        const order = ["close", "pct_chg", "change", "volume", "vol", "oi", "open", "high", "low"];
+        const keys = order.filter((key) => rec[key] != null && rec[key] !== "");
+        const sigs = keys.slice(0, 4).map((key) => `${signalLabel(key)} ${formatSignalValue(key, rec[key])}`).join(", ");
+        return sigs ? `${inst} — ${sigs}` : `${inst} — evidence bound`;
+      }
+      return `${inst} — evidence bound`;
+    });
+    if (parts.length) return parts.join("; ");
+    const requiredEn = Array.isArray(material.required_materials) ? material.required_materials : [];
+    return requiredEn.length ? `Bound: ${requiredEn.slice(0, 5).join(", ")}` : "No external evidence is required for this state";
+  }
   if (usefulFacts.length) return usefulFacts.slice(0, 2).join("；");
   const required = Array.isArray(material.required_materials) ? material.required_materials : [];
   return required.length ? `已绑定：${required.slice(0, 5).join("、")}` : "该状态不需要外部证据";
@@ -1434,7 +1459,7 @@ function formatSignalValue(key, value) {
 
 function bindingSignals(binding) {
   const record = latestEvidenceRecord(binding.records);
-  if (!record) return "已通过来源校验";
+  if (!record) return ui("已通过来源校验", "Passed source verification");
   const preferred = [
     "全国-同比增长", "全国-环比增长", "当月同比增长", "制造业-指数",
     "非制造业-指数", "国内生产总值-同比增长", "gdp_yoy", "cpi_yoy", "ppi_yoy",
@@ -1448,7 +1473,7 @@ function bindingSignals(binding) {
     const rightRank = preferred.indexOf(right);
     return (leftRank < 0 ? 999 : leftRank) - (rightRank < 0 ? 999 : rightRank);
   });
-  return usable.slice(0, 2).map(([key, value]) => `${signalLabel(key)} ${formatSignalValue(key, value)}`).join(" · ") || "提供方记录可用";
+  return usable.slice(0, 2).map(([key, value]) => `${signalLabel(key)} ${formatSignalValue(key, value)}`).join(" · ") || ui("提供方记录可用", "Provider record available");
 }
 
 function nodeSourceSummary(nodeId, analysis = state.analysis) {
@@ -3003,69 +3028,83 @@ function renderDecision() {
   const index = Math.max(0, (analysis.execution_order || []).indexOf(selectedId));
   const evidenceStage = event.stage === "evidence";
   const assemblyStage = event.stage === "assembly" && event.type !== "assembly";
-  els.decisionContextLabel.textContent = evidenceStage ? "当前证据状态" : assemblyStage ? "当前写作状态" : "当前构建对象";
-  els.evidenceLabel.textContent = evidenceStage || assemblyStage ? "状态级证据" : "构建依据";
-  els.conditionLabel.textContent = evidenceStage ? "数据处理" : assemblyStage ? "报告产出" : "当前产出";
+  els.decisionContextLabel.textContent = evidenceStage ? ui("当前证据状态", "Current evidence state") : assemblyStage ? ui("当前写作状态", "Current writing state") : ui("当前构建对象", "Current construction object");
+  els.evidenceLabel.textContent = evidenceStage || assemblyStage ? ui("状态级证据", "State-level evidence") : ui("构建依据", "Construction basis");
+  els.conditionLabel.textContent = evidenceStage ? ui("数据处理", "Data processing") : assemblyStage ? ui("报告产出", "Report output") : ui("当前产出", "Current output");
 
   if (event.type === "dfa") {
     els.decisionIndex.textContent = "DFA";
-    els.decisionTitle.textContent = "离线全局写作 DFA";
-    els.evidenceText.textContent = `${nodes.length} 个语义状态，${analysis.template?.edges?.length || 0} 条稳定转移`;
-    els.conditionText.textContent = analysis.runtime?.rebuilt ? "全局写作 DFA 本次已重建" : "直接复用已构建的全局写作 DFA 缓存";
+    els.decisionTitle.textContent = ui("离线全局写作 DFA", "Offline Global Writing DFA");
+    els.evidenceText.textContent = IS_ENGLISH
+      ? `${nodes.length} semantic states, ${analysis.template?.edges?.length || 0} stable transitions`
+      : `${nodes.length} 个语义状态，${analysis.template?.edges?.length || 0} 条稳定转移`;
+    els.conditionText.textContent = analysis.runtime?.rebuilt
+      ? ui("全局写作 DFA 本次已重建", "Global Writing DFA rebuilt for this run")
+      : ui("直接复用已构建的全局写作 DFA 缓存", "Reuse the built Global Writing DFA cache directly");
   } else if (event.type === "query") {
     els.decisionIndex.textContent = "Q";
-    els.decisionTitle.textContent = "当前对话约束";
+    els.decisionTitle.textContent = ui("当前对话约束", "Current Query Constraints");
     els.evidenceText.textContent = analysis.query;
     els.conditionText.textContent = [analysis.domain, analysis.date, analysis.constraints?.report_type].filter(Boolean).join(" · ");
   } else if (event.type === "ranked") {
     const top = (analysis.ranked || []).slice(0, 5);
     els.decisionIndex.textContent = "Top-K";
-    els.decisionTitle.textContent = "候选语义状态";
-    els.evidenceText.textContent = top.map((item) => `${item.label} ${Number(item.score || item.similarity || 0).toFixed(2)}`).join(" · ") || "没有候选状态";
-    els.conditionText.textContent = `按语义相似度排序，下一步应用 τ=${Number(analysis.tau || 0).toFixed(2)}`;
+    els.decisionTitle.textContent = ui("候选语义状态", "Candidate Semantic States");
+    els.evidenceText.textContent = top.map((item) => `${item.label} ${Number(item.score || item.similarity || 0).toFixed(2)}`).join(" · ") || ui("没有候选状态", "No candidate states");
+    els.conditionText.textContent = ui(`按语义相似度排序，下一步应用 τ=${Number(analysis.tau || 0).toFixed(2)}`, `Ranked by semantic similarity; apply τ=${Number(analysis.tau || 0).toFixed(2)} next`);
   } else if (event.type === "matched") {
     els.decisionIndex.textContent = "τ";
-    els.decisionTitle.textContent = "对话命中状态";
-    els.evidenceText.textContent = `Query 与全局状态索引的相似度超过阈值`;
+    els.decisionTitle.textContent = ui("对话命中状态", "Query-Matched States");
+    els.evidenceText.textContent = ui("Query 与全局状态索引的相似度超过阈值", "Similarity to the global state index exceeds the threshold");
     els.conditionText.textContent = labelsFor(event.activeNodes);
   } else if (event.type === "raw") {
     els.decisionIndex.textContent = "G′";
-    els.decisionTitle.textContent = "候选 Query-Specific Sub-DFA";
+    els.decisionTitle.textContent = ui("候选 Query-Specific Sub-DFA", "Candidate Query-Specific Sub-DFA");
     els.evidenceText.textContent = labelsFor(event.activeNodes);
-    els.conditionText.textContent = `从 Global Writing DFA 的公共祖先 ${analysis.subtree_root || "root"} 抽取相关路径`;
+    els.conditionText.textContent = ui(`从 Global Writing DFA 的公共祖先 ${analysis.subtree_root || "root"} 抽取相关路径`, `Extract relevant paths from the Global Writing DFA common ancestor ${analysis.subtree_root || "root"}`);
   } else if (event.type === "closure") {
     const raw = new Set(analysis.raw_subdfa?.node_ids || []);
     const added = (event.activeNodes || []).filter((id) => !raw.has(id));
     els.decisionIndex.textContent = "δ";
-    els.decisionTitle.textContent = "路径与转移闭包";
-    els.evidenceText.textContent = added.length ? `补入连接状态：${labelsFor(added)}` : "候选 Sub-DFA 已经连通";
-    els.conditionText.textContent = `保留 ${event.activeNodes?.length || 0} 个状态和 ${event.activeEdges?.length || 0} 条可执行转移`;
+    els.decisionTitle.textContent = ui("路径与转移闭包", "Path and Transition Closure");
+    els.evidenceText.textContent = added.length ? ui(`补入连接状态：${labelsFor(added)}`, `Add connecting states: ${labelsFor(added)}`) : ui("候选 Sub-DFA 已经连通", "The candidate Sub-DFA is connected");
+    els.conditionText.textContent = IS_ENGLISH
+      ? `Keep ${event.activeNodes?.length || 0} states and ${event.activeEdges?.length || 0} executable transitions`
+      : `保留 ${event.activeNodes?.length || 0} 个状态和 ${event.activeEdges?.length || 0} 条可执行转移`;
   } else if (event.type === "finalized") {
     els.decisionIndex.textContent = "Sub";
-    els.decisionTitle.textContent = "本次 Query-Specific Sub-DFA";
-    els.evidenceText.textContent = `${event.activeNodes?.length || 0} 个状态 · ${event.activeEdges?.length || 0} 条转移`;
-    els.conditionText.textContent = `执行顺序：${labelsFor(analysis.execution_order)}`;
+    els.decisionTitle.textContent = ui("本次 Query-Specific Sub-DFA", "This Query-Specific Sub-DFA");
+    els.evidenceText.textContent = IS_ENGLISH
+      ? `${event.activeNodes?.length || 0} states · ${event.activeEdges?.length || 0} transitions`
+      : `${event.activeNodes?.length || 0} 个状态 · ${event.activeEdges?.length || 0} 条转移`;
+    els.conditionText.textContent = ui(`执行顺序：${labelsFor(analysis.execution_order)}`, `Execution order: ${labelsFor(analysis.execution_order)}`);
   } else if (event.type === "assembly") {
     els.decisionIndex.textContent = "F";
     const blocked = analysis.report_status === "blocked";
-    els.decisionTitle.textContent = blocked ? "报告受阻" : "最终报告";
+    els.decisionTitle.textContent = blocked ? ui("报告受阻", "Report Blocked") : ui("最终报告", "Final Report");
     els.evidenceText.textContent = blocked
-      ? `0 / ${analysis.report_sections?.length || 0} 个状态片段取得提供方证据绑定`
-      : `${analysis.report_sections?.length || 0} 个状态片段已生成`;
-    els.conditionText.textContent = blocked ? evidenceProblem(analysis) : "到达终止状态 F，按执行顺序组装文档";
+      ? IS_ENGLISH
+        ? `0 / ${analysis.report_sections?.length || 0} state sections obtained provider-evidence binding`
+        : `0 / ${analysis.report_sections?.length || 0} 个状态片段取得提供方证据绑定`
+      : IS_ENGLISH
+        ? `${analysis.report_sections?.length || 0} state sections generated`
+        : `${analysis.report_sections?.length || 0} 个状态片段已生成`;
+    els.conditionText.textContent = blocked ? evidenceProblem(analysis) : ui("到达终止状态 F，按执行顺序组装文档", "Reach terminal state F and assemble the document in execution order");
   } else {
     els.decisionIndex.textContent = selectedId ? `S${String(index + 1).padStart(2, "0")}` : "S";
-    els.decisionTitle.textContent = node?.label || "写作状态";
-    els.evidenceText.textContent = selectedId ? materialSummary(selectedId) : "等待状态级证据";
+    els.decisionTitle.textContent = node?.label || ui("写作状态", "Writing State");
+    els.evidenceText.textContent = selectedId ? materialSummary(selectedId) : ui("等待状态级证据", "Waiting for state-level evidence");
   }
 
   if (event.type === "transition") {
     const edge = analysis.template?.edges?.find((item) => item.id === event.edgeId);
     els.conditionText.textContent = conditionForEdge(edge);
   } else if (event.type === "evidence") {
-    els.conditionText.textContent = "完成截止日、发布日与记录完整性校验";
+    els.conditionText.textContent = ui("完成截止日、发布日与记录完整性校验", "Complete cutoff-date, release-date, and record-completeness checks");
   } else if (event.type === "generation") {
-    els.conditionText.textContent = `基于已绑定的提供方证据生成片段 ${Math.min((event.generatedUntil || 0), analysis.report_sections?.length || 0)} / ${analysis.report_sections?.length || 0}`;
+    els.conditionText.textContent = IS_ENGLISH
+      ? `Generate section ${Math.min((event.generatedUntil || 0), analysis.report_sections?.length || 0)} / ${analysis.report_sections?.length || 0} from bound provider evidence`
+      : `基于已绑定的提供方证据生成片段 ${Math.min((event.generatedUntil || 0), analysis.report_sections?.length || 0)} / ${analysis.report_sections?.length || 0}`;
   }
 }
 
@@ -3099,18 +3138,20 @@ function renderRuntimeDetail() {
   if (!analysis) return;
   const runtime = analysis.runtime || {};
   const dfaSource = runtime.dfa_source === "user"
-    ? `我的 DFA · ${runtime.user_dfa?.name || "自定义结构"}`
-    : `系统写作 DFA · ${runtime.artifact_mode || "cache"}${runtime.rebuilt ? " · 本次重建" : " · 已复用"}`;
+    ? IS_ENGLISH ? `My DFA · ${runtime.user_dfa?.name || "Custom Structure"}` : `我的 DFA · ${runtime.user_dfa?.name || "自定义结构"}`
+    : IS_ENGLISH
+      ? `System Writing DFA · ${runtime.artifact_mode || "cache"}${runtime.rebuilt ? " · Rebuilt for this run" : " · Reused"}`
+      : `系统写作 DFA · ${runtime.artifact_mode || "cache"}${runtime.rebuilt ? " · 本次重建" : " · 已复用"}`;
   const items = [
-    ["写作领域", analysis.domain || "自动识别"],
-    ["DFA 来源", dfaSource],
-    ["语义表示", runtime.embedding?.mode === "semantic-api" ? runtime.embedding?.model || "Semantic API" : "Local hash"],
-    ["证据来源", evidenceSourceLabel(analysis)]
+    [ui("写作领域", "Domain"), analysis.domain || ui("自动识别", "Auto-detect")],
+    [ui("DFA 来源", "DFA Source"), dfaSource],
+    [ui("语义表示", "Semantic Representation"), runtime.embedding?.mode === "semantic-api" ? runtime.embedding?.model || "Semantic API" : "Local hash"],
+    [ui("证据来源", "Evidence Source"), evidenceSourceLabel(analysis)]
   ];
   els.runDetailGrid.innerHTML = items.map(([label, value]) => `
     <div class="detail-item"><span>${escapeHtml(label)}</span><strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong></div>
   `).join("");
-  els.dfaRuntime.textContent = runtime.dfa_source === "user" ? "我的 DFA" : (runtime.rebuilt ? "本次重建" : "复用缓存");
+  els.dfaRuntime.textContent = runtime.dfa_source === "user" ? ui("我的 DFA", "My DFA") : (runtime.rebuilt ? ui("本次重建", "Rebuilt for this run") : ui("复用缓存", "Cache reused"));
   els.evidenceRuntime.textContent = evidenceSourceLabel(analysis);
   els.modelRuntime.textContent = state.response?.model || state.health?.model || "Fallback";
 }
@@ -3782,7 +3823,7 @@ function bindEvents() {
     const text = reportText();
     if (!text) return;
     await navigator.clipboard.writeText(text);
-    els.reportProgress.textContent = "已复制";
+    els.reportProgress.textContent = state.language === "en" ? "Copied" : "已复制";
     window.setTimeout(() => renderReport(), 900);
   });
   els.downloadReport.addEventListener("click", downloadReport);

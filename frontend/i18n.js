@@ -1,8 +1,25 @@
 (() => {
   const STORAGE_KEY = "autologic-language-v1";
-  const language = localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "zh";
+  const host = window.location.hostname.toLowerCase();
+  const isPublicAnonymousBuild = (
+    host.endsWith(".github.io")
+    || host === "anonymous.4open.science"
+    || host.endsWith(".4open.science")
+  );
+  const language = isPublicAnonymousBuild
+    ? "en"
+    : (localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "zh");
   const exact = new Map(Object.entries({
     "新建任务": "New Task",
+    "进入系统": "Enter Studio",
+    "后端未连接": "Backend Disconnected",
+    "等待连接": "Waiting for Connection",
+    "API 离线": "API Offline",
+    "请求失败": "Request Failed",
+    "选择要导入的垂类": "Select a domain to import",
+    "转移起点": "Transition source",
+    "转移终点": "Transition target",
+    "用户 DFA": "User DFA",
     "切换国际版": "Switch Language",
     "查看离线全局写作 DFA": "View Offline Global Writing DFA",
     "查看全局写作 DFA": "View Global Writing DFA",
@@ -366,6 +383,12 @@
   }));
 
   const replacements = [
+    ["上传模板 DFA", "Uploaded Template DFA"],
+    ["上传Template DFA", "Uploaded Template DFA"],
+    ["上传模板", "Uploaded Template"],
+    ["未分类模板", "Uncategorized Template"],
+    ["尚未导入垂类结构", "No domain structure imported yet"],
+    ["尚未导入聚类structure", "No domain structure imported yet"],
     ["正在根据全局写作 DFA 与当前对话构建 Query-Specific Sub-DFA。", "Building a Query-Specific Sub-DFA from the Global Writing DFA and the current query."],
     ["当前只展示结构推导，不提前显示报告正文。", "Only structural reasoning is shown at this stage; report prose remains hidden."],
     ["结构已锁定，下一步开始逐状态检索证据；完整正文将在全部状态生成后统一展示。", "The structure is locked. Evidence retrieval now runs state by state; the full report will appear only after every state is complete."],
@@ -420,7 +443,71 @@
     ["报告生成中", "Generating Report"],
     ["生成完成", "Generation Complete"],
     ["运行失败", "Run Failed"],
-    ["请先输入报告需求", "Please enter a report request first"]
+    ["请先输入报告需求", "Please enter a report request first"],
+    ["写作领域", "Domain"],
+    ["语义表示", "Semantic Representation"],
+    ["证据来源", "Evidence Source"],
+    ["自动识别", "Auto-detect"],
+    ["候选语义状态", "Candidate Semantic States"],
+    ["没有候选状态", "No candidate states"],
+    ["对话命中状态", "Query-Matched States"],
+    ["当前对话约束", "Current Query Constraints"],
+    ["Query 与全局状态索引的相似度超过阈值", "Similarity to the global state index exceeds the threshold"],
+    ["按语义相似度排序", "Ranked by semantic similarity"],
+    ["路径与转移闭包", "Path and Transition Closure"],
+    ["补入连接状态", "Add connecting states"],
+    ["候选 Sub-DFA 已经连通", "The candidate Sub-DFA is connected"],
+    ["从 Global Writing DFA 的公共祖先", "From the Global Writing DFA common ancestor"],
+    ["抽取相关路径", "extract the relevant paths"],
+    ["本次 Query-Specific Sub-DFA", "This Query-Specific Sub-DFA"],
+    ["候选 Query-Specific Sub-DFA", "Candidate Query-Specific Sub-DFA"],
+    ["离线全局写作 DFA", "Offline Global Writing DFA"],
+    ["全局写作 DFA 本次已重建", "Global Writing DFA rebuilt for this run"],
+    ["直接复用已构建的全局写作 DFA 缓存", "Reuse the built Global Writing DFA cache directly"],
+    ["本次重建", "Rebuilt for this run"],
+    ["已复用", "Reused"],
+    ["到达终止状态 F，按执行顺序组装文档", "Reach terminal state F and assemble the document in execution order"],
+    ["完成截止日、发布日与记录完整性校验", "Complete cutoff-date, release-date, and record-completeness checks"],
+    ["报告生成过程", "Report Generation Process"],
+    ["等待状态级证据", "Waiting for state-level evidence"],
+    ["所有状态片段完成并按确定性执行顺序组装后，再统一显示最终文章。", "The final article is shown only after every state section is completed and assembled in deterministic execution order."],
+    ["结构已锁定，下一步开始逐状态检索证据；完整正文将在全部状态生成后统一展示。", "The structure is locked; state-level evidence retrieval begins next, and the full text is shown after every state is generated."],
+    ["系统全局写作 DFA", "System Global Writing DFA"],
+    ["提供方证据可用", "Provider Evidence Available"],
+    ["全部绑定", "Fully Bound"],
+    ["部分绑定", "Partially Bound"],
+    ["证据受阻", "Evidence Blocked"],
+    ["等待证据绑定", "Waiting for Evidence Binding"],
+    ["已完成", "Completed"],
+    ["正在执行", "In Progress"],
+    ["等待执行", "Pending"],
+    ["正在生成", "Generating"],
+    ["等待前序状态", "Waiting for prior states"],
+    ["状态片段已生成", "Section generated"],
+    ["等待状态输出", "Waiting for state output"],
+    ["回看", "Review"],
+    ["执行中", "Running"],
+    ["完整报告", "Complete Report"],
+    ["未生成", "Not Generated"],
+    ["我的 DFA", "My DFA"],
+    ["自定义结构", "Custom Structure"],
+    ["用户结构", "User Structure"],
+    ["系统结构", "System Structure"],
+    ["市场数据待绑定", "Market data pending binding"],
+    ["无真实证据", "No live evidence"],
+    ["生成完成", "Generation Complete"],
+    ["步骤", "Step"],
+    ["Query-Specific Sub-DFA 已就绪，正在准备报告状态片段。", "The Query-Specific Sub-DFA is ready; report sections are being prepared."],
+    ["Query-Specific Sub-DFA 已锁定", "Query-Specific Sub-DFA Locked"],
+    ["本地回退", "Local Fallback"],
+    ["离线演示证据", "Built-in Demo Evidence"],
+    ["报告未生成", "Report Not Generated"],
+    ["证据受阻", "Evidence Blocked"],
+    ["报告受阻 · 检查证据源", "Report Blocked · Check Evidence Sources"],
+    ["报告已部分生成 · 检查未绑定状态", "Report Partially Generated · Check Unbound States"],
+    ["调整完成", "Revision Complete"],
+    ["调整失败", "Revision Failed"],
+    ["原始版本 · 已保留", "Original Version · Preserved"]
   ];
 
   function translateText(value) {
@@ -428,11 +515,80 @@
     const trimmed = value.trim();
     if (exact.has(trimmed)) return value.replace(trimmed, exact.get(trimmed));
     let output = value;
+
+    // Pass 1 (demo completion): specific parameterized rules applied to the ORIGINAL Chinese,
+    // before the generic dictionary, so interpolated numbers/ids are preserved. English-mode only.
+    const DEMO_MONTHS = { 1: "January", 2: "February", 3: "March", 4: "April", 5: "May", 6: "June", 7: "July", 8: "August", 9: "September", 10: "October", 11: "November", 12: "December" };
+    const demoRules = [
+      [/(\d{4})年(\d{1,2})月(\d{1,2})日/g, (m, y, mo, d) => `${DEMO_MONTHS[Number(mo)] || mo} ${Number(d)}, ${y}`],
+      // backend market evidence facts
+      [/较上一期上涨\s*([\d.]+)%/g, "up $1% from the prior period"],
+      [/较上一期下跌\s*([\d.]+)%/g, "down $1% from the prior period"],
+      [/较上一期持平/g, "flat versus the prior period"],
+      [/期内高低点为\s*([\d.,]+)和([\d.,]+)/g, "session high/low $1 / $2"],
+      [/收盘价为/g, " closed at "],
+      [/成交量/g, " volume "],
+      [/持仓量/g, " open interest "],
+      [/可核验数据/g, "verifiable data"],
+      [/接口=/g, "endpoint="],
+      [/标的=/g, "instrument="],
+      [/记录=/g, "records="],
+      [/查询截止/g, "query cutoff"],
+      // dynamic UI subtitles (original source forms)
+      [/复用\s*(\d+)\s*个状态与\s*(\d+)\s*条稳定转移[，,]\s*本次不重新学习/g, "Reuse $1 states and $2 stable transitions, with no relearning for this run"],
+      [/本次不重新学习/g, "with no relearning for this run"],
+      [/复用缓存/g, "Reused cache"],
+      [/已复用/g, "reused"],
+      [/复用/g, "Reuse"],
+      [/得到\s*Top-(\d+)\s*候选状态[，,]?\s*准备应用阈值\s*τ=([\d.]+)/g, "Obtain Top-$1 candidate states; preparing to apply threshold τ=$2"],
+      [/(\d+)\s*个候选状态/g, "$1 candidate states"],
+      [/(\d+)\s*个状态通过筛选/g, "$1 states passed filtering"],
+      [/(\d+)\s*个状态\s*·\s*(\d+)\s*条候选转移/g, "$1 states · $2 candidate transitions"],
+      [/按语义相似度排序[，,]\s*下一步应用\s*τ=([\d.]+)/g, "ranked by semantic similarity; apply τ=$1 next"],
+      [/保留\s*(\d+)\s*个状态；低于阈值时按\s*fallback top-k\s*补足/g, "keep $1 states; below threshold, fill via fallback top-k"],
+      [/保留\s*(\d+)\s*个状态和\s*(\d+)\s*条可执行转移/g, "keep $1 states and $2 executable transitions"],
+      [/从初始状态到命中状态形成\s*(\d+)\s*个状态、(\d+)\s*条条件转移的候选\s*Sub-DFA/g, "form a candidate Sub-DFA from the initial state to the matched states, with $1 states and $2 conditional transitions"],
+      [/从初始states?到命中states?形成\s*(\d+)\s*个状态、(\d+)\s*条条件Transitions?的候选\s*Sub-DFA/g, "form a candidate Sub-DFA from the initial state to the matched states, with $1 states and $2 conditional transitions"],
+      [/依据当前对话[，,、]\s*历史频率和条件优先级排除\s*(\d+)\s*条分支/g, "exclude $1 branches using the current query, historical frequency, and condition priority"],
+      [/依据Current对话[，,、]\s*历史频率和条件优先级排除\s*(\d+)\s*分支/g, "exclude $1 branches using the current query, historical frequency, and condition priority"],
+      [/从\s*Global Writing DFA\s*的公共祖先\s*(\S+?)\s*抽取相关路径/g, "extract relevant paths from the Global Writing DFA common ancestor $1"],
+      [/(\d+)\s*个写作状态已确定/g, "$1 writing states confirmed"],
+      [/候选 Sub-DFA 已经是一条确定性的可执行路径/g, "the candidate Sub-DFA is already a deterministic executable path"],
+      [/基于已绑定的提供方证据生成片段\s*(\d+)\s*\/\s*(\d+)/g, "generate section $1 / $2 from bound provider evidence"],
+      [/引用已绑定的提供方证据[，,]\s*[A-Za-z]*生成第\s*(\d+)\s*\/\s*(\d+)\s*个状态片段/g, "using bound provider evidence, generate state section $1 / $2"],
+      [/引用已绑定的提供方证据/g, "using bound provider evidence"],
+      [/沿已执行路径组装\s*(\d+)\s*个状态片段/g, "assemble $1 state sections along the executed path"],
+      [/0\s*\/\s*(\d+)\s*个状态片段取得提供方证据绑定/g, "0 / $1 state sections obtained provider-evidence binding"],
+      [/达到终止状态\s*F/g, "reach terminal state F"],
+      [/唯一稳定后继[，,]\s*直接转移/g, "only stable successor; direct transition"],
+      [/提取领域、时间范围与报告约束/g, "extract the domain, time range, and report constraints"],
+      // counters / classifiers
+      [/(\d+)\s*个状态\s*·\s*(\d+)\s*条转移\s*·\s*(\d+)\s*个可执行写作状态/g, "$1 states · $2 transitions · $3 executable writing states"],
+      [/(\d+)\s*个语义状态[，,]\s*(\d+)\s*条稳定转移/g, "$1 semantic states, $2 stable transitions"],
+      [/来自\s*(.+?)\s*·\s*(\d+)\s*个数据集\s*·\s*(\d+)\s*条时点记录/g, "from $1 · $2 datasets · $3 point-in-time records"],
+      [/(\d+)\s*个状态\s*·\s*(\d+)\s*条转移/g, "$1 states · $2 transitions"],
+      [/(\d+)\s*个状态片段已生成/g, "$1 state sections generated"],
+      [/(\d+)\s*个状态片段/g, "$1 state sections"],
+      [/(\d+)\s*个数据集/g, "$1 datasets"],
+      [/(\d+)\s*条时点记录/g, "$1 point-in-time records"],
+      [/(\d+)\s*条(?:稳定|可执行|条件)?转移/g, "$1 transitions"],
+      [/(\d+)\s*个(?:语义|写作)?状态/g, "$1 states"],
+      [/(\d+)\s*条分支/g, "$1 branches"],
+      [/在(?=[A-Za-z0-9])/g, " on "]
+    ];
+    for (const [re, rep] of demoRules) output = output.replace(re, rep);
+
+    // Pass 2: dictionary phrases (longest first).
     const phrases = [...replacements, ...exact.entries()].sort((left, right) => right[0].length - left[0].length);
     for (const [zh, en] of phrases) output = output.split(zh).join(en);
+
+    // Pass 3: generic leftovers + punctuation normalization.
     output = output.replace(/(\d+)\s*段/g, "$1 sections");
     output = output.replace(/(\d+)\s*个State section generated/g, "$1 state sections generated");
+    output = output.replaceAll("与", " and ");
     output = output.replaceAll("、", ", ").replaceAll("：", ": ");
+    output = output.replaceAll("，", ", ").replaceAll("；", "; ").replaceAll("。", ". ");
+    output = output.replace(/\s{2,}/g, " ");
     return output;
   }
 
@@ -513,11 +669,18 @@
 
   const button = document.getElementById("languageToggleButton");
   if (button) {
-    button.querySelector("strong").textContent = language === "en" ? "中文版" : "International";
-    button.querySelector("small").textContent = language === "en" ? "切换中文" : "English";
-    button.addEventListener("click", () => {
-      localStorage.setItem(STORAGE_KEY, language === "en" ? "zh" : "en");
-      window.location.reload();
-    });
+    if (isPublicAnonymousBuild) {
+      button.querySelector("strong").textContent = "International Edition";
+      button.querySelector("small").textContent = "English";
+      button.setAttribute("aria-label", "International English edition");
+      button.disabled = true;
+    } else {
+      button.querySelector("strong").textContent = language === "en" ? "中文版" : "International";
+      button.querySelector("small").textContent = language === "en" ? "切换中文" : "English";
+      button.addEventListener("click", () => {
+        localStorage.setItem(STORAGE_KEY, language === "en" ? "zh" : "en");
+        window.location.reload();
+      });
+    }
   }
 })();

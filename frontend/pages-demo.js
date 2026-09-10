@@ -2,6 +2,7 @@
   const DB_NAME = "autologic-pages-demo-v1";
   const DB_VERSION = 1;
   const STORES = ["templateDfas", "jobs", "runs"];
+  const memoryStores = Object.fromEntries(STORES.map((name) => [name, new Map()]));
   const DOMAIN_DEFINITIONS = {
     precious_metals: {
       domain: "Precious Metals",
@@ -66,9 +67,29 @@
     });
   }
 
-  const dbPut = (store, value) => transact(store, "readwrite", (target) => target.put(value));
-  const dbGet = (store, id) => transact(store, "readonly", (target) => target.get(id));
-  const dbGetAll = (store) => transact(store, "readonly", (target) => target.getAll());
+  const dbPut = async (store, value) => {
+    try {
+      return await transact(store, "readwrite", (target) => target.put(value));
+    } catch (_error) {
+      memoryStores[store].set(value.id, structuredClone(value));
+      return value.id;
+    }
+  };
+  const dbGet = async (store, id) => {
+    try {
+      return await transact(store, "readonly", (target) => target.get(id));
+    } catch (_error) {
+      const value = memoryStores[store].get(id);
+      return value ? structuredClone(value) : undefined;
+    }
+  };
+  const dbGetAll = async (store) => {
+    try {
+      return await transact(store, "readonly", (target) => target.getAll());
+    } catch (_error) {
+      return [...memoryStores[store].values()].map((value) => structuredClone(value));
+    }
+  };
 
   function domainKey(payload = {}) {
     const requested = String(payload.custom_dfa?.baseDomain || payload.domain || "").toLowerCase();

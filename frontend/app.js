@@ -19,6 +19,23 @@ const IS_GITHUB_PAGES = (
 );
 const NODE_W = 208;
 const NODE_H = 78;
+function safeStorageGet(key) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 // Read the same persisted language flag as i18n.js directly. This keeps
 // runtime-generated cards in English even if a cached browser tab evaluates
 // app.js before window.AutoLogicI18n is reattached during a hard navigation.
@@ -29,7 +46,7 @@ const IS_ENGLISH = (
   ||
   window.AutoLogicI18n?.language === "en"
   || document.documentElement.lang === "en"
-  || localStorage.getItem("autologic-language-v1") === "en"
+  || safeStorageGet("autologic-language-v1") === "en"
 );
 const ui = (chinese, english) => IS_ENGLISH ? english : chinese;
 const THRESHOLD_PRESETS = Object.freeze({
@@ -341,7 +358,7 @@ function resolveTimePreset(preset) {
 
 function loadMyDfas() {
   try {
-    const value = JSON.parse(localStorage.getItem(MY_DFA_STORAGE_KEY) || "[]");
+    const value = JSON.parse(safeStorageGet(MY_DFA_STORAGE_KEY) || "[]");
     return Array.isArray(value) ? value : [];
   } catch (_error) {
     return [];
@@ -349,7 +366,7 @@ function loadMyDfas() {
 }
 
 function loadComposerDfaId() {
-  return localStorage.getItem(COMPOSER_DFA_STORAGE_KEY) || "system";
+  return safeStorageGet(COMPOSER_DFA_STORAGE_KEY) || "system";
 }
 
 function selectedComposerDfa() {
@@ -381,11 +398,11 @@ function renderComposerDfaOptions() {
     : state.myDfas.length || state.uploadedDfas.length
       ? ui("当前使用系统诱导得到的全局写作 DFA；也可以切换到自定义 DFA 或模板诱导 DFA。", "The run uses the system-induced Global Writing DFA; you can also switch to a custom or template-induced DFA.")
       : ui("当前使用系统诱导得到的全局写作 DFA。可以手动构建，也可以上传模板自动归纳新的 DFA。", "The run uses the system-induced Global Writing DFA. You can build a custom DFA manually or induce one from uploaded templates.");
-  localStorage.setItem(COMPOSER_DFA_STORAGE_KEY, state.composerDfaId);
+  safeStorageSet(COMPOSER_DFA_STORAGE_KEY, state.composerDfaId);
 }
 
 function persistMyDfas() {
-  localStorage.setItem(MY_DFA_STORAGE_KEY, JSON.stringify(state.myDfas));
+  safeStorageSet(MY_DFA_STORAGE_KEY, JSON.stringify(state.myDfas));
   renderComposerDfaOptions();
 }
 
@@ -395,7 +412,7 @@ function cloneJson(value) {
 
 function loadHistory() {
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const value = JSON.parse(safeStorageGet(STORAGE_KEY) || "[]");
     return Array.isArray(value) ? value : [];
   } catch (_error) {
     return [];
@@ -406,7 +423,7 @@ function saveHistory() {
   const persisted = state.history.slice(0, 20).map((item) => ({ ...item }));
   while (persisted.length) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
+      if (!safeStorageSet(STORAGE_KEY, JSON.stringify(persisted))) return;
       return;
     } catch (_error) {
       const snapshotIndex = persisted.map((item) => Boolean(item.analysisSnapshot)).lastIndexOf(true);
@@ -833,7 +850,7 @@ function useUploadedDfa(id, closeModal = true) {
   const dfa = state.uploadedDfas.find((item) => item.id === id);
   if (!dfa) return;
   state.composerDfaId = dfa.id;
-  localStorage.setItem(COMPOSER_DFA_STORAGE_KEY, state.composerDfaId);
+  safeStorageSet(COMPOSER_DFA_STORAGE_KEY, state.composerDfaId);
   if (dfa.baseDomain && Array.from(els.domain.options).some((option) => option.value === dfa.baseDomain)) els.domain.value = dfa.baseDomain;
   renderComposerDfaOptions();
   if (closeModal && els.uploadDfaModal.open) els.uploadDfaModal.close();

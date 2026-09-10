@@ -1,5 +1,19 @@
 (() => {
   const STORAGE_KEY = "autologic-language-v1";
+  const safeStorageGet = (key) => {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (_error) {
+      return null;
+    }
+  };
+  const safeStorageSet = (key, value) => {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (_error) {
+      // Anonymous GitHub embeds the site in a sandbox without storage access.
+    }
+  };
   const host = window.location.hostname.toLowerCase();
   const isPublicAnonymousBuild = (
     host.endsWith(".github.io")
@@ -8,7 +22,7 @@
   );
   const language = isPublicAnonymousBuild
     ? "en"
-    : (localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "zh");
+    : (safeStorageGet(STORAGE_KEY) === "en" ? "en" : "zh");
   const exact = new Map(Object.entries({
     "新建任务": "New Task",
     "进入系统": "Enter Studio",
@@ -678,7 +692,7 @@
       button.querySelector("strong").textContent = language === "en" ? "中文版" : "International";
       button.querySelector("small").textContent = language === "en" ? "切换中文" : "English";
       button.addEventListener("click", () => {
-        localStorage.setItem(STORAGE_KEY, language === "en" ? "zh" : "en");
+        safeStorageSet(STORAGE_KEY, language === "en" ? "zh" : "en");
         window.location.reload();
       });
     }

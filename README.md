@@ -40,6 +40,8 @@ Open the anonymous repository: <https://anonymous.4open.science/r/autologic-revi
 
 Open the anonymous interactive frontend: <https://anonymous.4open.science/w/autologic-review/>
 
+Watch the anonymously hosted demonstration video: <https://anonymous.4open.science/w/autologic-review/video.html>
+
 The anonymous review mirror exposes the static frontend as an interactive browser demo. It constructs a Query-Specific Sub-DFA from a Global Writing DFA, visualizes state matching and execution, assembles a clearly labelled demo report, and stores uploaded-template DFA records in IndexedDB on the current device. Live market data, cross-device persistence, and model-generated conclusions require the Python backend; use the Windows quick start below for the complete application.
 
 ## Quick start on Windows

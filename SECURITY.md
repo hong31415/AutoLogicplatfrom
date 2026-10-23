@@ -9,7 +9,7 @@
 
 ## Local-only configuration
 
-The backend reads credentials from environment variables or `backend/.env`. Keys are not entered in the browser and are never placed in frontend code or browser storage.
+The backend reads credentials from environment variables or `backend/.env`. The API Settings page can send credentials to the backend for saving; saved values are masked when displayed and are not placed in frontend source code. Do not expose credential entry over plain HTTP. Set `SUBDFA_CONFIG_ADMIN_TOKEN` before enabling remote configuration.
 
 ## Data and DFA caches
 

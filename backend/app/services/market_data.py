@@ -4,6 +4,7 @@ import copy
 import calendar
 import importlib.util
 import json
+import math
 import re
 import threading
 import time
@@ -14,7 +15,7 @@ from typing import Any, Callable
 from app.config import settings
 
 
-_CACHE: dict[tuple[str, str, str], tuple[float, dict[str, Any]]] = {}
+_CACHE: dict[tuple[str, str, str, str], tuple[float, dict[str, Any]]] = {}
 _CACHE_LOCK = threading.Lock()
 
 FUTURES_SYMBOLS: dict[str, tuple[str, ...]] = {
@@ -39,11 +40,13 @@ TUSHARE_EXCHANGES: dict[str, tuple[str, ...]] = {
 
 
 def provider_health() -> dict[str, Any]:
+    akshare_installed = importlib.util.find_spec("akshare") is not None
     return {
         "default": settings.market_data_source,
         "akshare": {
-            "installed": importlib.util.find_spec("akshare") is not None,
-            "configured": True,
+            "enabled": settings.akshare_enabled,
+            "installed": akshare_installed,
+            "configured": settings.akshare_enabled and akshare_installed,
             "requires_credentials": False,
         },
         "tushare": {
@@ -125,9 +128,17 @@ def _json_value(value: Any) -> Any:
     return str(value)
 
 
-def _records_from_frame(frame: Any, target: date_type, endpoint: str, limit: int = 3) -> list[dict[str, Any]]:
+def _record_partitions_from_frame(
+    frame: Any,
+    target: date_type,
+    endpoint: str,
+    start: date_type | None = None,
+    limit: int = 3,
+    range_limit: int = 120,
+    context_limit: int = 5,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     if frame is None or not hasattr(frame, "to_dict") or getattr(frame, "empty", False):
-        return []
+        return [], []
     rows = frame.to_dict(orient="records")
     normalized: list[tuple[str, dict[str, Any]]] = []
     date_keys = (
@@ -162,7 +173,49 @@ def _records_from_frame(frame: Any, target: date_type, endpoint: str, limit: int
                 pass
         normalized.append((row_date, clean))
     normalized.sort(key=lambda item: item[0])
-    return [record for _, record in normalized[-limit:]]
+    if not start:
+        return [record for _, record in normalized[-limit:]], []
+
+    context_floor = start - timedelta(days=settings.market_data_lookback_days)
+    in_range: list[dict[str, Any]] = []
+    context: list[tuple[date_type, dict[str, Any]]] = []
+    for row_date, record in normalized:
+        try:
+            period = datetime.strptime(row_date, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            continue
+        if period >= start:
+            in_range.append(record)
+        elif period >= context_floor:
+            context.append((period, record))
+
+    weighted_context = []
+    for period, record in context[-context_limit:]:
+        days_before = max(1, (start - period).days)
+        # Recent baseline observations matter, but never outrank requested-
+        # period evidence.  A smooth decay avoids abrupt weekly boundaries.
+        weight = round(max(0.2, 0.7 * math.exp(-days_before / 30.0)), 3)
+        weighted_context.append({"weight": weight, "days_before_start": days_before, "record": record})
+    return in_range[-range_limit:], weighted_context
+
+
+def _records_from_frame(
+    frame: Any,
+    target: date_type,
+    endpoint: str,
+    start: date_type | None = None,
+    limit: int = 3,
+    range_limit: int = 120,
+) -> list[dict[str, Any]]:
+    records, _ = _record_partitions_from_frame(
+        frame,
+        target,
+        endpoint,
+        start=start,
+        limit=limit,
+        range_limit=range_limit,
+    )
+    return records
 
 
 def _snapshot(
@@ -172,8 +225,9 @@ def _snapshot(
     frame: Any,
     target: date_type,
     category: str,
+    start: date_type | None = None,
 ) -> dict[str, Any] | None:
-    records = _records_from_frame(frame, target, endpoint)
+    records, context_records = _record_partitions_from_frame(frame, target, endpoint, start=start)
     if not records:
         return None
     return {
@@ -182,15 +236,21 @@ def _snapshot(
         "instrument": instrument,
         "category": category,
         "records": records,
+        "context_records": context_records,
     }
 
 
-def _run_calls(calls: list[tuple[str, str, str, Callable[[], Any]]], provider: str, target: date_type) -> tuple[list[dict[str, Any]], list[str]]:
+def _run_calls(
+    calls: list[tuple[str, str, str, Callable[[], Any]]],
+    provider: str,
+    target: date_type,
+    start: date_type | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     snapshots: list[dict[str, Any]] = []
     errors: list[str] = []
     for endpoint, instrument, category, callback in calls:
         try:
-            item = _snapshot(provider, endpoint, instrument, callback(), target, category)
+            item = _snapshot(provider, endpoint, instrument, callback(), target, category, start=start)
             if item:
                 snapshots.append(item)
         except Exception as exc:  # noqa: BLE001 - one public endpoint must not stop the report.
@@ -201,7 +261,11 @@ def _run_calls(calls: list[tuple[str, str, str, Callable[[], Any]]], provider: s
     return snapshots, errors
 
 
-def _akshare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _akshare_snapshots(
+    domain_key: str,
+    target: date_type,
+    start: date_type | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if importlib.util.find_spec("akshare") is None:
         return [], {"status": "not_installed", "calls": 0, "errors": ["akshare is not installed"]}
     import akshare as ak
@@ -211,7 +275,8 @@ def _akshare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[st
         for symbol in FUTURES_SYMBOLS[domain_key]:
             calls.append(("futures_zh_daily_sina", symbol, "market", lambda symbol=symbol: ak.futures_zh_daily_sina(symbol=symbol)))
     elif domain_key == "etf":
-        start = (target - timedelta(days=settings.market_data_lookback_days)).strftime("%Y%m%d")
+        retrieval_start = (start - timedelta(days=settings.market_data_lookback_days)) if start else (target - timedelta(days=settings.market_data_lookback_days))
+        start_text = retrieval_start.strftime("%Y%m%d")
         end = target.strftime("%Y%m%d")
         for symbol in ETF_SYMBOLS:
             calls.append(
@@ -219,7 +284,7 @@ def _akshare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[st
                     "fund_etf_hist_em",
                     symbol,
                     "market",
-                    lambda symbol=symbol: ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date=start, end_date=end, adjust=""),
+                    lambda symbol=symbol: ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date=start_text, end_date=end, adjust=""),
                 )
             )
     else:
@@ -231,7 +296,7 @@ def _akshare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[st
         )
         calls.extend(macro_calls)
 
-    snapshots, errors = _run_calls(calls, "AkShare", target)
+    snapshots, errors = _run_calls(calls, "AkShare", target, start=start)
     return snapshots, {
         "status": "found" if snapshots else ("error" if errors else "no_data"),
         "calls": len(calls),
@@ -240,7 +305,11 @@ def _akshare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[st
     }
 
 
-def _tushare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _tushare_snapshots(
+    domain_key: str,
+    target: date_type,
+    start: date_type | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if importlib.util.find_spec("tushare") is None:
         return [], {"status": "not_installed", "calls": 0, "errors": ["tushare is not installed"]}
     if not settings.tushare_token:
@@ -250,17 +319,23 @@ def _tushare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[st
 
     pro = ts.pro_api(settings.tushare_token)
     calls: list[tuple[str, str, str, Callable[[], Any]]] = []
-    start = (target - timedelta(days=settings.market_data_lookback_days)).strftime("%Y%m%d")
+    retrieval_start = (start - timedelta(days=settings.market_data_lookback_days)) if start else (target - timedelta(days=settings.market_data_lookback_days))
+    start_text = retrieval_start.strftime("%Y%m%d")
     end = target.strftime("%Y%m%d")
     if domain_key in TUSHARE_FUTURES:
         prefixes = TUSHARE_FUTURES[domain_key]
         for exchange in TUSHARE_EXCHANGES[domain_key]:
             def fetch_futures(exchange: str = exchange) -> Any:
-                frame = pro.query("fut_daily", exchange=exchange, start_date=start, end_date=end)
+                frame = pro.query("fut_daily", exchange=exchange, start_date=start_text, end_date=end)
                 if frame is None or getattr(frame, "empty", False) or "ts_code" not in frame.columns:
                     return frame
                 pattern = "^(?:" + "|".join(re.escape(prefix) for prefix in prefixes) + ")"
-                return frame[frame["ts_code"].astype(str).str.match(pattern, case=False, na=False)]
+                selected = frame[frame["ts_code"].astype(str).str.match(pattern, case=False, na=False)]
+                # Prefer provider continuous-series codes such as CU.SHF over
+                # multiple dated contracts from the same trading day.
+                continuous_pattern = "^(?:" + "|".join(re.escape(prefix) for prefix in prefixes) + r")\.[A-Z]+$"
+                continuous = selected[selected["ts_code"].astype(str).str.match(continuous_pattern, case=False, na=False)]
+                return continuous if not continuous.empty else selected
 
             calls.append(("fut_daily", exchange, "market", fetch_futures))
     elif domain_key == "etf":
@@ -270,14 +345,14 @@ def _tushare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[st
                     "fund_daily",
                     ts_code,
                     "market",
-                    lambda ts_code=ts_code: pro.query("fund_daily", ts_code=ts_code, start_date=start, end_date=end),
+                    lambda ts_code=ts_code: pro.query("fund_daily", ts_code=ts_code, start_date=start_text, end_date=end),
                 )
             )
     else:
         for endpoint, instrument in (("cn_cpi", "中国CPI"), ("cn_ppi", "中国PPI"), ("cn_pmi", "中国PMI"), ("cn_gdp", "中国GDP")):
             calls.append((endpoint, instrument, "macro", lambda endpoint=endpoint: pro.query(endpoint)))
 
-    snapshots, errors = _run_calls(calls, "Tushare", target)
+    snapshots, errors = _run_calls(calls, "Tushare", target, start=start)
     return snapshots, {
         "status": "found" if snapshots else ("error" if errors else "no_data"),
         "calls": len(calls),
@@ -288,9 +363,11 @@ def _tushare_snapshots(domain_key: str, target: date_type) -> tuple[list[dict[st
 
 def _snapshot_text(snapshot: dict[str, Any], query_date: str) -> str:
     payload = json.dumps(snapshot["records"], ensure_ascii=False, separators=(",", ":"))
+    context_payload = json.dumps(snapshot.get("context_records", []), ensure_ascii=False, separators=(",", ":"))
     return (
         f"{snapshot['provider']} 可核验数据；接口={snapshot['endpoint']}；"
-        f"标的={snapshot['instrument']}；查询截止={query_date}；记录={payload[:1800]}"
+        f"标的={snapshot['instrument']}；查询截止={query_date}；"
+        f"区间内记录={payload[:1500]}；区间前基线={context_payload[:800]}"
     )
 
 
@@ -318,6 +395,7 @@ def _snapshots_for_node(node: dict[str, Any], snapshots: list[dict[str, Any]]) -
 def _build_result(
     *,
     source: str,
+    query_start_date: str,
     query_date: str,
     order: list[str],
     frontend_node_by_id: dict[str, dict[str, Any]],
@@ -337,12 +415,20 @@ def _build_result(
                 "state_label": node.get("label", ""),
                 "required_material": ", ".join(node.get("materials", [])) or "state evidence",
                 "date": query_date,
+                "start_date": query_start_date,
+                "end_date": query_date,
                 "provider": snapshot["provider"],
                 "endpoint": snapshot["endpoint"],
                 "instrument": snapshot["instrument"],
                 "status": "found",
                 "error": "",
                 "records": snapshot["records"],
+                "context_records": snapshot.get("context_records", []),
+                "weighting": {
+                    "in_range_weight": 1.0,
+                    "pre_period_role": "baseline_only",
+                    "pre_period_weights": [item.get("weight") for item in snapshot.get("context_records", [])],
+                },
                 "raw_text": _snapshot_text(snapshot, query_date),
             }
             bindings.append(binding)
@@ -377,6 +463,8 @@ def _build_result(
         },
         "error": errors[0] if errors and not found else "",
         "query_date": query_date,
+        "query_start_date": query_start_date,
+        "query_end_date": query_date,
         "bindings_by_node": by_node,
     }
 
@@ -388,9 +476,15 @@ def retrieve_market_materials(
     query_date: str,
     order: list[str],
     frontend_node_by_id: dict[str, dict[str, Any]],
+    start_date: str = "",
 ) -> dict[str, Any]:
     selected = source if source in {"auto", "akshare", "tushare"} else "auto"
-    key = (selected, domain_key, query_date)
+    target = _target_date(query_date)
+    start = _target_date(start_date) if start_date else None
+    if start and start > target:
+        start, target = target, start
+        start_date, query_date = start.isoformat(), target.isoformat()
+    key = (selected, domain_key, start_date, query_date)
     now = time.monotonic()
     with _CACHE_LOCK:
         cached = _CACHE.get(key)
@@ -399,20 +493,22 @@ def retrieve_market_materials(
             result["cache_hit"] = True
             return result
 
-    target = _target_date(query_date)
     snapshots: list[dict[str, Any]] = []
     providers: dict[str, Any] = {}
-    if selected in {"auto", "akshare"}:
-        items, detail = _akshare_snapshots(domain_key, target)
+    if selected in {"auto", "akshare"} and settings.akshare_enabled:
+        items, detail = _akshare_snapshots(domain_key, target, start=start)
         snapshots.extend(items)
         providers["AkShare"] = detail
+    elif selected == "akshare":
+        providers["AkShare"] = {"status": "disabled", "calls": 0, "found": 0, "errors": []}
     if selected in {"auto", "tushare"}:
-        items, detail = _tushare_snapshots(domain_key, target)
+        items, detail = _tushare_snapshots(domain_key, target, start=start)
         snapshots.extend(items)
         providers["Tushare"] = detail
 
     result = _build_result(
         source=selected,
+        query_start_date=start_date,
         query_date=query_date,
         order=order,
         frontend_node_by_id=frontend_node_by_id,

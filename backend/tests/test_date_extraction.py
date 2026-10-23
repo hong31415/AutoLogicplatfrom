@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import date
 
-from app.services.pipeline import extract_date
+from app.services.pipeline import extract_date, extract_date_range
 
 
 class ExtractDateTests(unittest.TestCase):
@@ -30,6 +30,23 @@ class ExtractDateTests(unittest.TestCase):
         for text, expected in examples.items():
             with self.subTest(text=text):
                 self.assertEqual(extract_date(text, date(2026, 8, 25)), expected)
+
+    def test_explicit_ranges_preserve_both_boundaries(self) -> None:
+        examples = {
+            "2025-06-02 to 2025-06-08": ("2025-06-02", "2025-06-08"),
+            "2025-06-02 至 2025-06-08": ("2025-06-02", "2025-06-08"),
+            "2025年6月2日至6月8日": ("2025-06-02", "2025-06-08"),
+            "June 2–8, 2025": ("2025-06-02", "2025-06-08"),
+        }
+        for text, expected in examples.items():
+            with self.subTest(text=text):
+                self.assertEqual(extract_date_range(text, date(2026, 8, 25)), expected)
+
+    def test_single_cutoff_keeps_legacy_empty_start(self) -> None:
+        self.assertEqual(
+            extract_date_range("As of 2026-03-31", date(2026, 8, 25)),
+            ("", "2026-03-31"),
+        )
 
 
 if __name__ == "__main__":

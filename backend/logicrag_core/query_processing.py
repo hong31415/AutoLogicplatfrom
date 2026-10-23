@@ -136,6 +136,35 @@ def select_matched_states(
     return list(ranked_states[:fallback_top_k])
 
 
+def select_query_states(
+    ranked_states: Sequence[Dict[str, Any]],
+    tau: float,
+    fallback_top_k: int = 0,
+) -> List[Dict[str, Any]]:
+    """Combine explicit label requests with all semantic threshold matches.
+
+    An explicit writing-state label is a strong positive signal, not an
+    instruction to discard every other relevant state.  Preserve ranked order
+    while taking the union so a query such as "industry tracking report" can
+    still include investment, review, and risk states supported by semantics.
+    """
+    explicit_ids = {
+        str(state.get("node_id") or state.get("state_id"))
+        for state in ranked_states
+        if state.get("match_reason") == "explicit-label"
+    }
+    semantic = select_matched_states(ranked_states, tau, fallback_top_k)
+    selected_ids = explicit_ids | {
+        str(state.get("node_id") or state.get("state_id"))
+        for state in semantic
+    }
+    return [
+        state
+        for state in ranked_states
+        if str(state.get("node_id") or state.get("state_id")) in selected_ids
+    ]
+
+
 def build_node_maps(nodes: Sequence[Dict[str, Any]]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[str]]]:
     node_by_id = {str(node["node_id"]): node for node in nodes}
     children_by_id: Dict[str, List[str]] = {node_id: [] for node_id in node_by_id}
@@ -507,8 +536,7 @@ def run_query_processing(args: argparse.Namespace) -> Dict[str, Any]:
 
     query_vector = embed_query(args.query, index, args)
     ranked = apply_query_label_boost(args.query, rank_states_by_similarity(query_vector, index))
-    explicit_matches = [state for state in ranked if state.get("match_reason") == "explicit-label"]
-    matched = explicit_matches or select_matched_states(ranked, args.tau, args.fallback_top_k)
+    matched = select_query_states(ranked, args.tau, args.fallback_top_k)
 
     if not matched:
         preview = "\n".join(

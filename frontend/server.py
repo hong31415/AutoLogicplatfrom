@@ -26,6 +26,7 @@ class FrontendHandler(SimpleHTTPRequestHandler):
             headers={
                 "Content-Type": self.headers.get("Content-Type", "application/json"),
                 "Accept": self.headers.get("Accept", "application/json"),
+                "X-Config-Token": self.headers.get("X-Config-Token", ""),
             },
             method=self.command,
         )

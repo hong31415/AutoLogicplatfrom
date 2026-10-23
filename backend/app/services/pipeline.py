@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from app.config import settings
+from app.services.report_length import report_length_config, normalize_report_length
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -188,6 +189,7 @@ class RuntimeOptions:
     local_embedding_only: bool = True
     domain_override: str = ""
     language: str = "zh"
+    report_length: str = "standard"
 
 
 def bool_from_payload(value: Any, default: bool = False) -> bool:
@@ -202,7 +204,7 @@ def bool_from_payload(value: Any, default: bool = False) -> bool:
 
 def options_from_payload(payload: dict[str, Any] | None = None) -> RuntimeOptions:
     payload = payload or {}
-    remote_embedding_default = bool(settings.embedding_api_key)
+    remote_embedding_default = bool(settings.active_embedding_profile()["api_key"])
     remote_embedding = bool_from_payload(payload.get("remote_embedding"), remote_embedding_default)
     selected_source = str(payload.get("data_source", settings.market_data_source or "auto")).strip().lower()
     if selected_source not in {"auto", "akshare", "tushare", "ifind", "demo", "none"}:
@@ -222,15 +224,18 @@ def options_from_payload(payload: dict[str, Any] | None = None) -> RuntimeOption
         local_embedding_only=not remote_embedding,
         domain_override=str(payload.get("domain", "")).strip(),
         language="en" if str(payload.get("language", "zh")).lower().startswith("en") else "zh",
+        report_length=normalize_report_length(payload.get("report_length")),
     )
 
 
 def embedding_runtime_config() -> dict[str, Any]:
+    profile = settings.active_embedding_profile()
     return {
-        "model": settings.embedding_model or DEFAULT_EMBEDDING_MODEL,
-        "base_url": settings.embedding_base_url or DEFAULT_EMBEDDING_BASE_URL,
+        "provider": profile["provider"],
+        "model": profile["model"] or DEFAULT_EMBEDDING_MODEL,
+        "base_url": profile["base_url"] or DEFAULT_EMBEDDING_BASE_URL,
         "batch_size": settings.embedding_batch_size or DEFAULT_EMBEDDING_BATCH_SIZE,
-        "has_api_key": bool(settings.embedding_api_key),
+        "has_api_key": bool(profile["api_key"]),
     }
 
 
@@ -676,6 +681,80 @@ def extract_date(query: str, today: date_type | None = None) -> str:
     if re.search(r"上个月|上月", query):
         return (anchor.replace(day=1) - timedelta(days=1)).isoformat()
     return anchor.isoformat()
+
+
+def extract_date_range(query: str, today: date_type | None = None) -> tuple[str, str]:
+    """Return an explicit evidence range when the query contains one.
+
+    The second value always remains the point-in-time cutoff used by existing
+    callers.  The first value is empty for single-date and relative-date
+    requests so legacy lookback behavior remains available.
+    """
+    numeric_range = re.search(
+        r"(?P<sy>20\d{2})[-/.](?P<sm>\d{1,2})[-/.](?P<sd>\d{1,2})\s*"
+        r"(?:至|到|to|through|—|–|~|～|-)\s*"
+        r"(?:(?P<ey>20\d{2})[-/.])?(?P<em>\d{1,2})[-/.](?P<ed>\d{1,2})",
+        query,
+        flags=re.I,
+    )
+    if numeric_range:
+        start_year = int(numeric_range.group("sy"))
+        start_month = int(numeric_range.group("sm"))
+        end_month = int(numeric_range.group("em"))
+        end_year = int(numeric_range.group("ey") or start_year)
+        if not numeric_range.group("ey") and end_month < start_month:
+            end_year += 1
+        start = _valid_iso_date(start_year, start_month, int(numeric_range.group("sd")))
+        end = _valid_iso_date(end_year, end_month, int(numeric_range.group("ed")))
+        if start and end:
+            return start, end
+
+    chinese_range = re.search(
+        r"(?P<sy>20\d{2})\s*年\s*(?P<sm>\d{1,2})\s*月\s*(?P<sd>\d{1,2})\s*(?:日|号)?\s*"
+        r"(?:至|到|—|–|~|～|-)\s*"
+        r"(?:(?P<ey>20\d{2})\s*年\s*)?(?:(?P<em>\d{1,2})\s*月\s*)?(?P<ed>\d{1,2})\s*(?:日|号)?",
+        query,
+    )
+    if chinese_range:
+        start_year = int(chinese_range.group("sy"))
+        start_month = int(chinese_range.group("sm"))
+        end_month = int(chinese_range.group("em") or start_month)
+        end_year = int(chinese_range.group("ey") or start_year)
+        if not chinese_range.group("ey") and end_month < start_month:
+            end_year += 1
+        start = _valid_iso_date(start_year, start_month, int(chinese_range.group("sd")))
+        end = _valid_iso_date(end_year, end_month, int(chinese_range.group("ed")))
+        if start and end:
+            return start, end
+
+    english_months = {
+        name.lower(): index
+        for index, names in enumerate(
+            (
+                (),
+                ("January", "Jan"), ("February", "Feb"), ("March", "Mar"), ("April", "Apr"),
+                ("May",), ("June", "Jun"), ("July", "Jul"), ("August", "Aug"),
+                ("September", "Sep", "Sept"), ("October", "Oct"), ("November", "Nov"), ("December", "Dec"),
+            )
+        )
+        for name in names
+    }
+    english_written_range = re.search(
+        r"\b(?P<month>January|February|March|April|May|June|July|August|September|October|November|December|"
+        r"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+"
+        r"(?P<start_day>\d{1,2})\s*(?:to|through|—|–|~|-)\s*(?P<end_day>\d{1,2}),?\s*(?P<year>20\d{2})\b",
+        query,
+        flags=re.I,
+    )
+    if english_written_range:
+        year = int(english_written_range.group("year"))
+        month = english_months[english_written_range.group("month").lower()]
+        start = _valid_iso_date(year, month, int(english_written_range.group("start_day")))
+        end = _valid_iso_date(year, month, int(english_written_range.group("end_day")))
+        if start and end:
+            return start, end
+
+    return "", extract_date(query, today)
 
 
 def safe_query_id(query: str) -> str:
@@ -1663,12 +1742,27 @@ def materials_for(node_id: str, frontend_node: dict[str, Any], runtime: dict[str
 
 def sanitize_error(message: Any) -> str:
     text = str(message or "")
+    generation_secrets = [
+        settings.deepseek_api_key,
+        settings.openai_api_key,
+        settings.kimi_api_key,
+        settings.doubao_api_key,
+        settings.custom_generation_api_key,
+    ]
+    embedding_secrets = [
+        settings.embedding_api_key,
+        settings.dashscope_embedding_api_key,
+        settings.openai_embedding_api_key,
+        settings.doubao_embedding_api_key,
+        settings.zhipu_embedding_api_key,
+        settings.custom_embedding_api_key,
+    ]
     for secret in (
         settings.ifind_username,
         settings.ifind_password,
         settings.tushare_token,
-        settings.deepseek_api_key,
-        settings.embedding_api_key,
+        *generation_secrets,
+        *embedding_secrets,
     ):
         if secret:
             text = text.replace(secret, "***")
@@ -1870,9 +1964,13 @@ def change_description(metric: str, period: str, value: Any, growth_word: str = 
     return f"{metric}{period}{direction}{amount}"
 
 
-def market_binding_fact(binding: dict[str, Any], records: list[dict[str, Any]]) -> str:
+def market_binding_fact(
+    binding: dict[str, Any],
+    records: list[dict[str, Any]],
+    baseline: dict[str, Any] | None = None,
+) -> str:
     latest = records[-1]
-    previous = records[-2] if len(records) > 1 else {}
+    previous = baseline or (records[-2] if len(records) > 1 else {})
     instrument = str(binding.get("instrument", "相关标的"))
     date = display_date(first_record_value(latest, "date", "trade_date", "日期", "月份"))
     close = first_record_value(latest, "close", "收盘")
@@ -1887,7 +1985,8 @@ def market_binding_fact(binding: dict[str, Any], records: list[dict[str, Any]]) 
     if close_number is not None and previous_number not in (None, 0):
         change = (close_number / previous_number - 1) * 100
         direction = "上涨" if change > 0 else "下跌" if change < 0 else "持平"
-        parts.append(f"较上一期{direction}{abs(change):.2f}%")
+        comparison = "较区间前基准" if baseline else "较上一期"
+        parts.append(f"{comparison}{direction}{abs(change):.2f}%")
     if high is not None and low is not None:
         parts.append(f"期内高低点为{display_number(high)}和{display_number(low)}")
     if volume is not None:
@@ -1947,11 +2046,20 @@ def binding_to_fact(binding: dict[str, Any]) -> str:
     if binding.get("provider") == "demo":
         return str(binding.get("raw_text", "")).strip()[:1200]
     records = [record for record in binding.get("records", []) if isinstance(record, dict)]
+    context_items = [item for item in binding.get("context_records", []) if isinstance(item, dict)]
+    baseline = next(
+        (
+            item.get("record")
+            for item in reversed(context_items)
+            if isinstance(item.get("record"), dict)
+        ),
+        None,
+    )
     if records:
         category = str(binding.get("endpoint", "")).lower()
         if any(token in category for token in ("macro", "cpi", "ppi", "pmi", "gdp", "cn_")):
             return macro_binding_fact(binding, records)
-        return market_binding_fact(binding, records)
+        return market_binding_fact(binding, records, baseline=baseline)
     raw_text = re.sub(r"\s+", " ", str(binding.get("raw_text", "")).strip())
     if raw_text and not raw_text.startswith(("{", "[")):
         return raw_text[:900]
@@ -2213,7 +2321,8 @@ def build_analysis(query: str, tau: float = 0.5, payload: dict[str, Any] | None 
     visual_node_ids = [str(node_id) for node_id in selected_node_ids]
     visual_edge_ids = [str(edge_id_value) for edge_id_value in selected_edge_ids]
     order = execution_order(subtree)
-    date = extract_date(query)
+    start_date, date = extract_date_range(query)
+    length_config = report_length_config(options.report_length, options.language)
     runtime = {
         "embedding": {
             **embedding_runtime_config(),
@@ -2224,6 +2333,7 @@ def build_analysis(query: str, tau: float = 0.5, payload: dict[str, Any] | None 
         "domain_key": domain_key,
         "domain": spec["domain"],
         "language": options.language,
+        "report_length": length_config,
         "artifact_mode": artifacts["artifact_mode"],
         "dfa_source": "user" if isinstance(custom_dfa, dict) else "system",
         "user_dfa": {
@@ -2290,6 +2400,7 @@ def build_analysis(query: str, tau: float = 0.5, payload: dict[str, Any] | None 
         evidence_result = retrieve_market_materials(
             source=options.data_source,
             domain_key=domain_key,
+            start_date=start_date,
             query_date=date,
             order=order,
             frontend_node_by_id=frontend_node_by_id,
@@ -2342,10 +2453,14 @@ def build_analysis(query: str, tau: float = 0.5, payload: dict[str, Any] | None 
         },
         "constraints": {
             "date": date,
+            "start_date": start_date,
+            "end_date": date,
+            "time_range": f"{start_date} to {date}" if start_date else date,
             "report_type": "query-specific report",
             "domain": spec["domain"],
             "artifact_mode": artifacts["artifact_mode"],
             "output": "state-by-state report",
+            "report_length": length_config,
         },
         "template": frontend_template,
         "raw_subtree": subtree,

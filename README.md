@@ -10,7 +10,10 @@ AutoLogic Studio is a bilingual, evidence-driven research report workspace. It i
 - Upload-driven DFA induction for TXT, Markdown, CSV, JSON, HTML, DOCX, PPTX, XLSX, and PDF templates, with live progress, classified storage, preview, reuse, and editable copies
 - Query parsing, semantic state matching, Query-Specific Sub-DFA construction, evidence binding, and report assembly traces
 - Optional writing-state constraints: leave the field blank for DFA-driven state selection, or name required writing states when a fixed structure is genuinely needed
-- DeepSeek-compatible report generation and configurable embedding providers
+- Selectable DeepSeek, GPT/OpenAI, Kimi, Doubao, and OpenAI-compatible report models
+- Selectable DashScope, OpenAI, Doubao, Zhipu, and custom embedding providers
+- Compact, standard, and detailed report-length presets
+- In-app API configuration for report models, embeddings, and market data
 - AkShare, Tushare, optional iFinD, and optional MySQL integrations
 - Markdown report download and version-preserving report revision
 
@@ -34,15 +37,9 @@ subdfa-report-platform/
 
 Personal queries, custom user DFAs, raw corpora, retrieved market data, logs, databases, `.env`, and proprietary vendor binaries are intentionally excluded from Git.
 
-## Online frontend showcase
+## Frontend demo and complete application
 
-Open the anonymous repository: <https://anonymous.4open.science/r/autologic-review/>
-
-Open the anonymous interactive frontend: <https://anonymous.4open.science/w/autologic-review/>
-
-Watch the anonymously hosted demonstration video: <https://anonymous.4open.science/w/autologic-review/video.html>
-
-The anonymous review mirror exposes the static frontend as an interactive browser demo. It constructs a Query-Specific Sub-DFA from a Global Writing DFA, visualizes state matching and execution, assembles a clearly labelled demo report, and stores uploaded-template DFA records in IndexedDB on the current device. Live market data, cross-device persistence, and model-generated conclusions require the Python backend; use the Windows quick start below for the complete application.
+The static frontend can show an offline demonstration, but live market data and model-generated conclusions require the Python backend. Follow the Windows quick start below to run the complete application. The frontend is served at `http://127.0.0.1:8790/` by default.
 
 ## Quick start on Windows
 
@@ -78,11 +75,13 @@ Start the complete application:
 
 Open <http://127.0.0.1:8790/>. Use `stop_all.ps1` to stop both services.
 
-## Add your own API keys
+## Configure APIs
 
-Credentials stay in `backend/.env`, which is ignored by Git. Never put keys in frontend code or commit them to the repository.
+Open **API Settings** in the running web interface to save and switch report-model, embedding, and market-data profiles. Secrets are masked when existing settings are displayed. They are sent to the backend when saved and stored in `backend/.env`, which is ignored by Git. Do not commit this file or put keys in frontend source code. On a server exposed to other users, configure `SUBDFA_CONFIG_ADMIN_TOKEN` and use HTTPS before allowing anyone to enter credentials.
 
-### Report model (DeepSeek-compatible)
+You may also edit `backend/.env` directly, as shown below.
+
+### Report model
 
 ```dotenv
 DEEPSEEK_API_KEY=
@@ -90,7 +89,7 @@ DEEPSEEK_MODEL=deepseek-v4-pro
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
-You can use another OpenAI-compatible provider by changing the model and base URL.
+The web interface also supports saved GPT/OpenAI, Kimi, Doubao, and custom OpenAI-compatible profiles. Select the active provider there or set `SUBDFA_GENERATION_PROVIDER` in `backend/.env`.
 
 ### Semantic embedding
 
@@ -101,7 +100,7 @@ LOGICRAG_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LOGICRAG_EMBEDDING_BATCH_SIZE=10
 ```
 
-Without an embedding key, the platform falls back to local hash embeddings.
+The web interface also supports OpenAI, Doubao, Zhipu, and custom embedding profiles. Without an embedding key, the platform falls back to local hash embeddings.
 
 ### Market-data providers
 

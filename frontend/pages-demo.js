@@ -282,6 +282,15 @@
     const route = routeFor(template, selection.matched);
     const date = requestedCutoff(payload);
     const language = payload.language === "en" ? "en" : "zh";
+    const requestedLength = ["concise", "standard", "detailed"].includes(payload.report_length) ? payload.report_length : "standard";
+    const lengthRanges = language === "en"
+      ? { concise: [500, 800], standard: [1000, 1600], detailed: [2200, 3200] }
+      : { concise: [800, 1200], standard: [1800, 2500], detailed: [3500, 5000] };
+    const lengthLabels = language === "en"
+      ? { concise: "Concise", standard: "Standard", detailed: "Detailed" }
+      : { concise: "精简", standard: "标准", detailed: "详细" };
+    const [lengthMin, lengthMax] = lengthRanges[requestedLength];
+    const reportLength = { key: requestedLength, label: lengthLabels[requestedLength], min: lengthMin, max: lengthMax, unit: language === "en" ? "words" : "Chinese characters" };
     const order = selection.matched.map((item) => item.id);
     const materials = {};
     const sections = order.map((nodeId, index) => {
@@ -304,13 +313,13 @@
     }));
     return {
       query: String(payload.query || (language === "en" ? "AutoLogic Interactive Demo" : "AutoLogic 在线演示")), tau: Number(payload.tau || 0.2), theta: Number(payload.theta || 0.5), date,
-      domain: definition.domain, constraints: { date, domain: definition.domain, report_type: "query-specific demo report" },
+      domain: definition.domain, constraints: { date, domain: definition.domain, report_type: "query-specific demo report", report_length: reportLength },
       template, ranked: selection.ranked, matched: selection.matched,
       subtree_root: "S0", raw_subdfa: route, subdfa: route, execution_order: order, materials,
       report_sections: sections, report_status: "complete",
       evidence_summary: { total_bindings: allBindings.length, found_bindings: allBindings.length, provider: providerNames.join(" + ") },
       runtime: {
-        domain_key: key, domain: definition.domain, language, artifact_mode: "browser-demo", dfa_source: payload.custom_dfa ? "user" : "system",
+        domain_key: key, domain: definition.domain, language, report_length: reportLength, artifact_mode: "browser-demo", dfa_source: payload.custom_dfa ? "user" : "system",
         user_dfa: payload.custom_dfa ? { name: payload.custom_dfa.name || (language === "en" ? "User DFA" : "用户 DFA") } : null,
         rebuilt: false, fallback_top_k: Number(payload.fallback_top_k || 3),
         induction: { documents: 48, case_files: 24, frequency_threshold: 0.3, sequence_patterns: 6 },

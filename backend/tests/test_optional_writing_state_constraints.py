@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from logicrag_core.query_processing import apply_query_label_boost
+from logicrag_core.query_processing import apply_query_label_boost, select_query_states
 from app.services.pipeline import select_domain
 
 
@@ -30,6 +30,18 @@ class OptionalWritingStateConstraintTests(unittest.TestCase):
         by_id = {item["state_id"]: item for item in ranked}
         self.assertEqual(by_id["S02"]["similarity"], 0.92)
         self.assertEqual(by_id["S02"]["match_reason"], "explicit-label")
+
+    def test_explicit_label_does_not_discard_other_semantic_matches(self) -> None:
+        ranked = apply_query_label_boost(
+            "Generate an industry tracking report with positioning implications.",
+            [
+                {"state_id": "S01", "node_id": "S01", "label": "Industry Tracking", "similarity": 0.48},
+                {"state_id": "S02", "node_id": "S02", "label": "Investment Advice", "similarity": 0.63},
+                {"state_id": "S03", "node_id": "S03", "label": "Risk Factors", "similarity": 0.41},
+            ],
+        )
+        selected = select_query_states(ranked, tau=0.5)
+        self.assertEqual([item["node_id"] for item in selected], ["S01", "S02"])
 
     def test_precious_metals_query_with_industry_tracking_is_not_classified_as_etf(self) -> None:
         query = (

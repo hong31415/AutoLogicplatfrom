@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlparse
@@ -8,6 +9,7 @@ from urllib.parse import urlparse
 from app.config import settings
 from app.database import health as database_health
 from app.database import get_run, init_schema, save_run
+from app.services.api_settings import public_api_settings, save_api_settings
 from app.services.deepseek import generate_sections, refine_sections
 from app.services.market_data import provider_health
 from app.services.pipeline import build_analysis, build_steps, enrich_analysis_internal_dfa
@@ -29,7 +31,7 @@ def response(handler: BaseHTTPRequestHandler, status: int, payload: dict[str, An
     else:
         handler.send_header("Access-Control-Allow-Origin", settings.cors_origins[0])
     handler.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Config-Token")
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
@@ -43,6 +45,13 @@ def read_json(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
     return json.loads(handler.rfile.read(length).decode("utf-8"))
 
 
+def can_write_api_settings(handler: BaseHTTPRequestHandler, payload: dict[str, Any]) -> bool:
+    if settings.config_admin_token:
+        provided = str(handler.headers.get("X-Config-Token") or payload.get("admin_token") or "")
+        return bool(provided) and secrets.compare_digest(provided, settings.config_admin_token)
+    return settings.host.strip().lower() in {"127.0.0.1", "localhost", "::1"}
+
+
 class ApiHandler(BaseHTTPRequestHandler):
     server_version = "SubDFAPlatformBackend/1.0"
 
@@ -52,19 +61,23 @@ class ApiHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path == f"{settings.api_prefix}/health":
+            generation = settings.active_generation_profile()
+            embedding = settings.active_embedding_profile()
             response(
                 self,
                 200,
                 {
                     "ok": True,
                     "service": "subdfa-report-backend",
-                    "model": settings.deepseek_model,
-                    "has_api_key": bool(settings.deepseek_api_key),
+                    "model": generation["model"],
+                    "model_provider": generation["provider"],
+                    "has_api_key": bool(generation["api_key"]),
                     "demo_mode": settings.demo_mode,
                     "embedding": {
-                        "has_api_key": bool(settings.embedding_api_key),
-                        "model": settings.embedding_model,
-                        "base_url": settings.embedding_base_url,
+                        "provider": embedding["provider"],
+                        "has_api_key": bool(embedding["api_key"]),
+                        "model": embedding["model"],
+                        "base_url": embedding["base_url"],
                     },
                     "ifind": {
                         "enabled": settings.ifind_enabled,
@@ -80,6 +93,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "database": database_health(),
                 },
             )
+            return
+        if path == f"{settings.api_prefix}/settings/api":
+            response(self, 200, public_api_settings(settings))
             return
         run_prefix = f"{settings.api_prefix}/runs/"
         if path.startswith(run_prefix):
@@ -122,6 +138,22 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             payload = read_json(self)
+            generation = settings.active_generation_profile()
+            if path == f"{settings.api_prefix}/settings/api":
+                if not can_write_api_settings(self, payload):
+                    response(
+                        self,
+                        403,
+                        {
+                            "error": (
+                                "服务器部署必须设置 SUBDFA_CONFIG_ADMIN_TOKEN，"
+                                "并在 API 配置页面输入相同的管理令牌。"
+                            )
+                        },
+                    )
+                    return
+                response(self, 200, {"saved": True, "settings": save_api_settings(payload, settings)})
+                return
             if path == f"{settings.api_prefix}/template-dfa-jobs":
                 response(self, 202, create_template_dfa_job(payload))
                 return
@@ -147,7 +179,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     payload=payload,
                     analysis=analysis,
                     report_sections=analysis.get("report_sections", []),
-                    model_name=settings.deepseek_model,
+                    model_name=generation["model"],
                 )
                 response(self, 200, {"analysis": analysis, "run_id": run_id})
                 return
@@ -158,7 +190,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ai_used = False
                 ai_error = ""
                 has_evidence = any(section.get("evidence_verified") for section in sections)
-                if bool(payload.get("use_ai", True)) and has_evidence and settings.deepseek_api_key:
+                if bool(payload.get("use_ai", True)) and has_evidence and generation["api_key"]:
                     try:
                         sections = generate_sections(
                             settings=settings,
@@ -167,6 +199,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                             draft_sections=sections,
                             materials=analysis["materials"],
                             language=str(payload.get("language", "zh")),
+                            report_length=analysis.get("constraints", {}).get("report_length"),
                         )
                         ai_used = True
                     except Exception as exc:  # noqa: BLE001 - API returns controlled fallback.
@@ -191,7 +224,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     analysis=analysis,
                     report_sections=sections,
                     ai_used=ai_used,
-                    model_name=settings.deepseek_model,
+                    model_name=generation["model"],
                     status=persistence_status,
                     error_text=ai_error,
                 )
@@ -205,7 +238,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                         "ai_error": ai_error,
                         "report_status": report_status,
                         "evidence_summary": analysis.get("evidence_summary", {}),
-                        "model": settings.deepseek_model,
+                        "model": generation["model"],
+                        "model_provider": generation["provider"],
                         "run_id": run_id,
                     },
                 )
@@ -217,8 +251,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if not instruction or not isinstance(sections, list) or not sections:
                     response(self, 400, {"error": "instruction and sections are required"})
                     return
-                if not settings.deepseek_api_key:
-                    response(self, 503, {"error": "报告微调需要配置 DeepSeek API Key"})
+                if not generation["api_key"]:
+                    response(self, 503, {"error": "报告微调需要配置当前正文生成模型的 API Key"})
                     return
                 refined = refine_sections(
                     settings=settings,
@@ -228,8 +262,18 @@ class ApiHandler(BaseHTTPRequestHandler):
                     materials=payload.get("materials", {}) if isinstance(payload.get("materials", {}), dict) else {},
                     instruction=instruction,
                     language=str(payload.get("language", "zh")),
+                    report_length=payload.get("report_length"),
                 )
-                response(self, 200, {"report_sections": refined, "ai_used": True, "model": settings.deepseek_model})
+                response(
+                    self,
+                    200,
+                    {
+                        "report_sections": refined,
+                        "ai_used": True,
+                        "model": generation["model"],
+                        "model_provider": generation["provider"],
+                    },
+                )
                 return
 
             response(self, 404, {"error": "Not found"})

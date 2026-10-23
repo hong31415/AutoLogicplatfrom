@@ -54,6 +54,37 @@ const THRESHOLD_PRESETS = Object.freeze({
   balanced: { theta: 0.50, tau: 0.20, topK: 3, summary: ui("均衡 · 兼顾核心与覆盖", "Balanced · Core and coverage") },
   comprehensive: { theta: 0.30, tau: 0.10, topK: 8, summary: ui("全面 · 扩大状态覆盖", "Comprehensive · Expanded coverage") }
 });
+const REPORT_LENGTH_PRESETS = Object.freeze({
+  concise: {
+    label: ui("精简", "Concise"),
+    range: ui("800–1200 字", "500–800 words"),
+    hint: ui("适合摘要、快评和快速阅读。", "Best for briefs, quick takes, and fast reading.")
+  },
+  standard: {
+    label: ui("标准", "Standard"),
+    range: ui("1800–2500 字", "1000–1600 words"),
+    hint: ui("适合完整研究报告，兼顾分析深度与阅读效率。", "Balances analytical depth with reading efficiency.")
+  },
+  detailed: {
+    label: ui("详细", "Detailed"),
+    range: ui("3500–5000 字", "2200–3200 words"),
+    hint: ui("适合需要充分展开证据、逻辑和风险讨论的深度报告。", "Best for deeper evidence, reasoning, and risk discussion.")
+  }
+});
+const GENERATION_PROVIDER_PRESETS = Object.freeze({
+  deepseek: { label: "DeepSeek", model: "deepseek-chat", baseUrl: "https://api.deepseek.com" },
+  openai: { label: "GPT / OpenAI", model: "gpt-4.1-mini", baseUrl: "https://api.openai.com/v1" },
+  kimi: { label: "Kimi / Moonshot", model: "moonshot-v1-32k", baseUrl: "https://api.moonshot.cn/v1" },
+  doubao: { label: ui("豆包 / 火山引擎", "Doubao / Volcengine"), model: "doubao-seed-1-6-250615", baseUrl: "https://ark.cn-beijing.volces.com/api/v3" },
+  custom: { label: ui("自定义兼容接口", "Custom Compatible API"), model: "custom-model", baseUrl: "https://example.com/v1" }
+});
+const EMBEDDING_PROVIDER_PRESETS = Object.freeze({
+  dashscope: { label: ui("阿里云百炼 / DashScope", "Alibaba Cloud / DashScope"), model: "text-embedding-v4", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+  openai: { label: "OpenAI Embedding", model: "text-embedding-3-large", baseUrl: "https://api.openai.com/v1" },
+  doubao: { label: ui("豆包 Embedding", "Doubao Embedding"), model: "doubao-embedding-large-text-250515", baseUrl: "https://ark.cn-beijing.volces.com/api/v3" },
+  zhipu: { label: ui("智谱 Embedding", "Zhipu Embedding"), model: "embedding-3", baseUrl: "https://open.bigmodel.cn/api/paas/v4" },
+  custom: { label: ui("自定义兼容接口", "Custom Compatible API"), model: "embedding-model", baseUrl: "https://example.com/v1" }
+});
 const INTERNAL_DFA_STAGE_LABELS = Object.freeze({
   entry: ui("入口状态", "Entry State"),
   material: ui("材料绑定", "Material Binding"),
@@ -131,6 +162,10 @@ const els = {
   thresholdPresetControl: document.getElementById("composerThresholdControl"),
   thresholdPresetButtonLabel: document.getElementById("thresholdPresetButtonLabel"),
   thresholdPresetButtonMeta: document.getElementById("thresholdPresetButtonMeta"),
+  reportLengthControl: document.getElementById("reportLengthControl"),
+  reportLengthLabel: document.getElementById("reportLengthLabel"),
+  reportLengthMeta: document.getElementById("reportLengthMeta"),
+  reportLengthHint: document.getElementById("reportLengthHint"),
   composerDfaSourceControl: document.getElementById("composerDfaSourceControl"),
   composerDfaSourceLabel: document.getElementById("composerDfaSourceLabel"),
   composerDfaSourceMeta: document.getElementById("composerDfaSourceMeta"),
@@ -207,6 +242,33 @@ const els = {
   offlineDfaDetail: document.getElementById("offlineDfaDetail"),
   myDfa: document.getElementById("myDfaButton"),
   uploadDfa: document.getElementById("uploadDfaButton"),
+  apiSettings: document.getElementById("apiSettingsButton"),
+  composerApiSettings: document.getElementById("composerApiSettingsButton"),
+  apiSettingsIndicator: document.getElementById("apiSettingsIndicator"),
+  apiSettingsDialog: document.getElementById("apiSettingsDialog"),
+  apiSettingsForm: document.getElementById("apiSettingsForm"),
+  apiSettingsMessage: document.getElementById("apiSettingsMessage"),
+  closeApiSettings: document.getElementById("closeApiSettingsButton"),
+  cancelApiSettings: document.getElementById("cancelApiSettingsButton"),
+  saveApiSettings: document.getElementById("saveApiSettingsButton"),
+  apiAdminSection: document.getElementById("apiAdminSection"),
+  apiAdminToken: document.getElementById("apiAdminTokenInput"),
+  generationConfigStatus: document.getElementById("generationConfigStatus"),
+  generationActiveProvider: document.getElementById("generationActiveProviderSelect"),
+  generationProviderProfiles: document.getElementById("generationProviderProfiles"),
+  embeddingConfigStatus: document.getElementById("embeddingConfigStatus"),
+  embeddingActiveProvider: document.getElementById("embeddingActiveProviderSelect"),
+  embeddingProviderProfiles: document.getElementById("embeddingProviderProfiles"),
+  marketConfigStatus: document.getElementById("marketConfigStatus"),
+  evidenceActiveSource: document.getElementById("evidenceActiveSourceSelect"),
+  akshareEnabled: document.getElementById("akshareEnabledInput"),
+  akshareStatus: document.getElementById("akshareStatusText"),
+  tushareToken: document.getElementById("tushareTokenInput"),
+  clearTushareToken: document.getElementById("clearTushareTokenInput"),
+  ifindEnabled: document.getElementById("ifindEnabledInput"),
+  ifindUsername: document.getElementById("ifindUsernameInput"),
+  ifindPassword: document.getElementById("ifindPasswordInput"),
+  clearIfindCredentials: document.getElementById("clearIfindCredentialsInput"),
   uploadComposerDfa: document.getElementById("uploadComposerDfaButton"),
   uploadDfaModal: document.getElementById("uploadDfaModal"),
   closeUploadDfa: document.getElementById("closeUploadDfaButton"),
@@ -350,6 +412,20 @@ function applyThresholdPreset(name) {
   els.thetaValue.textContent = preset.theta.toFixed(2);
   els.tauValue.textContent = preset.tau.toFixed(2);
   updateThresholdPresetUi();
+}
+
+function applyReportLengthPreset(name) {
+  const key = REPORT_LENGTH_PRESETS[name] ? name : "standard";
+  const preset = REPORT_LENGTH_PRESETS[key];
+  document.querySelectorAll("[data-report-length]").forEach((button) => {
+    const active = button.dataset.reportLength === key;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  els.reportLengthLabel.textContent = preset.label;
+  els.reportLengthMeta.textContent = preset.range;
+  els.reportLengthHint.textContent = preset.hint;
+  els.reportLengthControl.open = false;
 }
 
 function resolveTimePreset(preset) {
@@ -640,14 +716,14 @@ function updateHistoryRun(patch) {
   renderHistory();
 }
 
-async function apiPost(path, payload) {
+async function apiPost(path, payload, extraHeaders = {}) {
   if (IS_GITHUB_PAGES) {
     if (!window.AutoLogicPagesDemo) throw new Error(ui("在线演示引擎加载失败，请刷新页面", "The online demo engine failed to load. Refresh the page."));
     return window.AutoLogicPagesDemo.apiPost(path, payload);
   }
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...extraHeaders },
     body: JSON.stringify(payload)
   });
   const data = await response.json().catch(() => ({}));
@@ -668,6 +744,241 @@ async function apiGet(path) {
     throw new Error(data.error || ui(`请求失败 (${response.status})`, `Request failed (${response.status})`));
   }
   return data;
+}
+
+function setApiConfigBadge(element, configured, detail = "") {
+  if (!element) return;
+  element.classList.toggle("configured", Boolean(configured));
+  element.textContent = `${configured ? ui("已配置", "Configured") : ui("未配置", "Not configured")}${detail ? ` · ${detail}` : ""}`;
+}
+
+function updateApiSettingsIndicator(settingsData) {
+  if (!els.apiSettingsIndicator) return;
+  const generationReady = Boolean(settingsData?.generation?.configured ?? settingsData?.deepseek?.configured ?? settingsData?.has_api_key);
+  const embeddingReady = Boolean(settingsData?.embedding?.configured ?? settingsData?.embedding?.has_api_key);
+  const evidence = settingsData?.evidence || {};
+  const akshareReady = Boolean(evidence.akshare?.configured);
+  const tushareReady = Boolean(evidence.tushare?.configured ?? settingsData?.tushare?.configured ?? settingsData?.data_sources?.tushare?.configured);
+  const ifindReady = Boolean(evidence.ifind?.configured ?? settingsData?.ifind?.configured ?? settingsData?.ifind?.has_credentials);
+  const configuredCount = [generationReady, embeddingReady, akshareReady, tushareReady, ifindReady].filter(Boolean).length;
+  els.apiSettingsIndicator.className = generationReady ? "ready" : configuredCount ? "partial" : "";
+  els.apiSettingsIndicator.title = generationReady
+    ? ui("正文模型 API 已配置", "Report model API configured")
+    : configuredCount
+      ? ui("部分 API 已配置", "Some APIs configured")
+      : ui("尚未配置 API", "No APIs configured");
+}
+
+function providerProfileMarkup(kind, providerId, preset, profile, activeProvider) {
+  const configured = Boolean(profile?.configured);
+  const masked = profile?.masked || "";
+  const active = providerId === activeProvider;
+  const savedText = configured
+    ? `${ui("已配置", "Configured")} ${masked}`
+    : ui("未配置", "Not configured");
+  const keyPlaceholder = configured
+    ? `${ui("已保存", "Saved")} ${masked} · ${ui("留空保持不变", "leave blank to keep")}`
+    : ui("输入自己的 API Key", "Enter your API key");
+  return `
+    <details class="api-provider-profile ${active ? "active" : ""}" data-provider-kind="${kind}" data-provider-id="${providerId}" data-configured="${configured}" ${active ? "open" : ""}>
+      <summary><strong>${escapeHtml(preset.label)}</strong><span>${escapeHtml(savedText)}</span></summary>
+      <div class="api-provider-fields">
+        <label><span>API Key</span><input data-provider-field="api_key" type="password" autocomplete="new-password" placeholder="${escapeHtml(keyPlaceholder)}" /></label>
+        <label><span>${ui("模型名称", "Model")}</span><input data-provider-field="model" type="text" maxlength="160" value="${escapeHtml(profile?.model || preset.model)}" /></label>
+        <label><span>${ui("接口地址", "Base URL")}</span><input data-provider-field="base_url" type="url" maxlength="500" value="${escapeHtml(profile?.base_url || preset.baseUrl)}" /></label>
+        <label class="api-clear-row"><input data-provider-field="clear_api_key" type="checkbox" /><span>${ui("清除已保存的 API Key", "Clear saved API key")}</span></label>
+      </div>
+    </details>`;
+}
+
+function renderProviderProfiles(container, kind, presets, profiles, activeProvider) {
+  container.innerHTML = Object.entries(presets)
+    .map(([providerId, preset]) => providerProfileMarkup(kind, providerId, preset, profiles?.[providerId] || {}, activeProvider))
+    .join("");
+}
+
+function updateActiveProviderUi(kind) {
+  const select = kind === "generation" ? els.generationActiveProvider : els.embeddingActiveProvider;
+  const container = kind === "generation" ? els.generationProviderProfiles : els.embeddingProviderProfiles;
+  let selectedProfile = null;
+  container.querySelectorAll("[data-provider-id]").forEach((profile) => {
+    const active = profile.dataset.providerId === select.value;
+    profile.classList.toggle("active", active);
+    if (active) {
+      profile.open = true;
+      selectedProfile = profile;
+    }
+  });
+  if (!selectedProfile) return;
+  const presets = kind === "generation" ? GENERATION_PROVIDER_PRESETS : EMBEDDING_PROVIDER_PRESETS;
+  const badge = kind === "generation" ? els.generationConfigStatus : els.embeddingConfigStatus;
+  const keyInput = selectedProfile.querySelector('[data-provider-field="api_key"]');
+  const modelInput = selectedProfile.querySelector('[data-provider-field="model"]');
+  const configured = selectedProfile.dataset.configured === "true" || Boolean(keyInput?.value.trim());
+  const detail = `${presets[select.value]?.label || ""}${modelInput?.value ? ` · ${modelInput.value}` : ""}`;
+  setApiConfigBadge(badge, configured, detail);
+}
+
+function collectProviderProfiles(container) {
+  return Object.fromEntries([...container.querySelectorAll("[data-provider-id]")].map((profile) => {
+    const field = (name) => profile.querySelector(`[data-provider-field="${name}"]`);
+    return [profile.dataset.providerId, {
+      api_key: field("api_key").value.trim(),
+      clear_api_key: field("clear_api_key").checked,
+      model: field("model").value.trim(),
+      base_url: field("base_url").value.trim()
+    }];
+  }));
+}
+
+function renderApiSettings(data) {
+  const generation = data.generation || {
+    active_provider: "deepseek",
+    configured: Boolean(data.deepseek?.configured),
+    providers: { deepseek: data.deepseek || {} }
+  };
+  const embedding = data.embedding || {};
+  const evidence = data.evidence || {};
+  const tushare = evidence.tushare || data.tushare || {};
+  const ifind = evidence.ifind || data.ifind || {};
+  const akshare = evidence.akshare || {};
+  els.apiAdminSection.hidden = !data.requires_admin_token;
+  els.generationActiveProvider.value = generation.active_provider || "deepseek";
+  renderProviderProfiles(
+    els.generationProviderProfiles,
+    "generation",
+    GENERATION_PROVIDER_PRESETS,
+    generation.providers || {},
+    els.generationActiveProvider.value
+  );
+  const activeGeneration = generation.providers?.[els.generationActiveProvider.value] || {};
+  setApiConfigBadge(
+    els.generationConfigStatus,
+    activeGeneration.configured,
+    `${GENERATION_PROVIDER_PRESETS[els.generationActiveProvider.value]?.label || ""}${activeGeneration.model ? ` · ${activeGeneration.model}` : ""}`
+  );
+
+  els.embeddingActiveProvider.value = embedding.active_provider || "dashscope";
+  renderProviderProfiles(
+    els.embeddingProviderProfiles,
+    "embedding",
+    EMBEDDING_PROVIDER_PRESETS,
+    embedding.providers || {},
+    els.embeddingActiveProvider.value
+  );
+  const activeEmbedding = embedding.providers?.[els.embeddingActiveProvider.value] || embedding;
+  setApiConfigBadge(
+    els.embeddingConfigStatus,
+    activeEmbedding.configured,
+    `${EMBEDDING_PROVIDER_PRESETS[els.embeddingActiveProvider.value]?.label || ""}${activeEmbedding.model ? ` · ${activeEmbedding.model}` : ""}`
+  );
+
+  els.evidenceActiveSource.value = evidence.active_source || "auto";
+  els.akshareEnabled.checked = akshare.enabled !== false;
+  els.akshareStatus.textContent = akshare.installed
+    ? ui("AkShare 已安装，无需 API Key，可直接使用。", "AkShare is installed and requires no API key.")
+    : ui("AkShare 无需 API Key，但当前后端尚未安装依赖。", "AkShare needs no API key, but the backend package is not installed.");
+
+  els.tushareToken.value = "";
+  els.tushareToken.placeholder = tushare.configured
+    ? `${ui("已保存", "Saved")} ${tushare.masked || ""} · ${ui("留空保持不变", "leave blank to keep")}`
+    : ui("输入自己的 Tushare Token", "Enter your Tushare token");
+  els.clearTushareToken.checked = false;
+  els.ifindEnabled.checked = Boolean(ifind.enabled);
+  els.ifindUsername.value = "";
+  els.ifindUsername.placeholder = ifind.username_masked
+    ? `${ui("已保存", "Saved")} ${ifind.username_masked} · ${ui("留空保持不变", "leave blank to keep")}`
+    : ui("输入自己的 iFinD 用户名", "Enter your iFinD username");
+  els.ifindPassword.value = "";
+  els.ifindPassword.placeholder = ifind.password_masked
+    ? `${ui("已保存", "Saved")} ${ifind.password_masked} · ${ui("留空保持不变", "leave blank to keep")}`
+    : ui("输入自己的 iFinD 密码", "Enter your iFinD password");
+  els.clearIfindCredentials.checked = false;
+  const marketDetails = [akshare.enabled ? "AkShare" : "", tushare.configured ? "Tushare" : "", ifind.configured ? "iFinD" : ""].filter(Boolean).join(" + ");
+  setApiConfigBadge(els.marketConfigStatus, Boolean(akshare.enabled || tushare.configured || ifind.configured), marketDetails);
+  if ([...els.dataSource.options].some((option) => option.value === els.evidenceActiveSource.value)) {
+    els.dataSource.value = els.evidenceActiveSource.value;
+  }
+  updateApiSettingsIndicator(data);
+}
+
+async function loadApiSettings() {
+  els.apiSettingsMessage.className = "api-settings-message";
+  els.apiSettingsMessage.textContent = ui("正在读取当前配置……", "Loading current configuration…");
+  els.saveApiSettings.disabled = true;
+  try {
+    const data = await apiGet("/settings/api");
+    renderApiSettings(data);
+    els.apiSettingsMessage.textContent = data.requires_admin_token
+      ? ui("服务器保护已启用。保存时请输入配置管理令牌。", "Server protection is enabled. Enter the configuration admin token to save.")
+      : ui("本机配置可直接修改。所有密钥字段留空时将保留现有值。", "Local configuration can be edited directly. Blank secret fields keep their current values.");
+  } catch (error) {
+    els.apiSettingsMessage.className = "api-settings-message error";
+    els.apiSettingsMessage.textContent = `${ui("读取失败", "Load failed")}: ${error.message}`;
+  } finally {
+    els.saveApiSettings.disabled = false;
+  }
+}
+
+function openApiSettings() {
+  if (IS_GITHUB_PAGES) {
+    window.alert(ui("在线演示版不保存 API 密钥，请在本地或服务器部署版中配置。", "The online demo does not store API keys. Configure them in a local or server deployment."));
+    return;
+  }
+  if (!els.apiSettingsDialog.open) els.apiSettingsDialog.showModal();
+  els.apiSettingsForm.scrollTop = 0;
+  loadApiSettings();
+}
+
+async function submitApiSettings(event) {
+  event.preventDefault();
+  els.saveApiSettings.disabled = true;
+  els.apiSettingsMessage.className = "api-settings-message";
+  els.apiSettingsMessage.textContent = ui("正在保存并应用配置……", "Saving and applying configuration…");
+  const payload = {
+    generation: {
+      active_provider: els.generationActiveProvider.value,
+      providers: collectProviderProfiles(els.generationProviderProfiles)
+    },
+    embedding: {
+      active_provider: els.embeddingActiveProvider.value,
+      providers: collectProviderProfiles(els.embeddingProviderProfiles)
+    },
+    evidence: {
+      active_source: els.evidenceActiveSource.value,
+      akshare: { enabled: els.akshareEnabled.checked },
+      tushare: {
+        token: els.tushareToken.value.trim(),
+        clear_token: els.clearTushareToken.checked
+      },
+      ifind: {
+        enabled: els.ifindEnabled.checked,
+        username: els.ifindUsername.value.trim(),
+        password: els.ifindPassword.value,
+        clear_credentials: els.clearIfindCredentials.checked
+      }
+    }
+  };
+  const adminToken = els.apiAdminToken.value.trim();
+  try {
+    const result = await apiPost(
+      "/settings/api",
+      payload,
+      adminToken ? { "X-Config-Token": adminToken } : {}
+    );
+    renderApiSettings(result.settings || {});
+    els.apiSettingsMessage.className = "api-settings-message success";
+    els.apiSettingsMessage.textContent = ui(
+      "配置已写入私有文件并立即应用。建议运行一个简短任务验证接口额度与权限。",
+      "Configuration was saved privately and applied immediately. Run a short task to verify API quota and permissions."
+    );
+    await checkApi();
+  } catch (error) {
+    els.apiSettingsMessage.className = "api-settings-message error";
+    els.apiSettingsMessage.textContent = `${ui("保存失败", "Save failed")}: ${error.message}`;
+  } finally {
+    els.saveApiSettings.disabled = false;
+  }
 }
 
 function formatBytes(value) {
@@ -1010,6 +1321,7 @@ async function checkApi() {
     els.modelRuntime.textContent = "Browser Demo";
     els.apiStatus.textContent = ui("在线演示引擎 · 浏览器数据库", "Online Demo · Browser Database");
     els.apiStatus.classList.remove("error");
+    if (els.apiSettingsIndicator) els.apiSettingsIndicator.className = "";
     return;
   }
   if (state.healthCheckInFlight) return;
@@ -1021,14 +1333,18 @@ async function checkApi() {
     const data = await response.json();
     const firstConnection = !state.health;
     state.health = data;
+    updateApiSettingsIndicator(data);
     connected = true;
     const embeddingReady = Boolean(data.embedding?.has_api_key);
     const sources = data.data_sources || {};
-    const akshareReady = Boolean(sources.akshare?.installed);
+    const akshareReady = Boolean(sources.akshare?.installed && sources.akshare?.enabled !== false);
     const tushareReady = Boolean(sources.tushare?.installed && sources.tushare?.configured);
     const ifindReady = Boolean(data.ifind?.has_credentials);
     const demoMode = Boolean(data.demo_mode);
     if (firstConnection) els.remoteEmbedding.checked = embeddingReady;
+    if (firstConnection && [...els.dataSource.options].some((option) => option.value === sources.default)) {
+      els.dataSource.value = sources.default;
+    }
     const tushareOption = els.dataSource.querySelector('option[value="tushare"]');
     const ifindOption = els.dataSource.querySelector('option[value="ifind"]');
     const demoOption = els.dataSource.querySelector('option[value="demo"]');
@@ -1042,7 +1358,9 @@ async function checkApi() {
     els.runtimeDot.className = "runtime-dot ready";
     els.runtimeStatus.textContent = "服务已连接";
     if (!state.analysis) els.dfaRuntime.textContent = "等待任务";
-    els.modelRuntime.textContent = data.has_api_key ? data.model : "本地回退";
+    els.modelRuntime.textContent = data.has_api_key
+      ? `${data.model_provider || "AI"} · ${data.model}`
+      : "本地回退";
     els.evidenceRuntime.textContent = demoMode && !akshareReady
       ? "离线演示证据"
       : akshareReady ? (tushareReady ? "AkShare + Tushare" : "AkShare") : "未配置";
@@ -1062,6 +1380,7 @@ async function checkApi() {
     els.modelRuntime.textContent = "-";
     els.apiStatus.textContent = ui("API 离线", "API Offline");
     els.apiStatus.classList.add("error");
+    if (els.apiSettingsIndicator) els.apiSettingsIndicator.className = "";
   } finally {
     state.healthCheckInFlight = false;
     scheduleApiCheck(connected ? 15000 : 2500);
@@ -1079,6 +1398,7 @@ function requestPayload(query) {
     tau: Number(els.tau.value),
     theta: Number(els.theta.value),
     fallback_top_k: Number(els.fallbackTopK.value),
+    report_length: document.querySelector("[data-report-length].active")?.dataset.reportLength || "standard",
     preview_top_k: 8,
     remote_embedding: els.remoteEmbedding.checked,
     data_source: els.dataSource.value,
@@ -1412,6 +1732,15 @@ function latestEvidenceRecord(records) {
   return [...records].sort((left, right) => periodSortKey(recordPeriod(left)).localeCompare(periodSortKey(recordPeriod(right)))).at(-1);
 }
 
+function evidencePeriodRange(records) {
+  const periods = (Array.isArray(records) ? records : [])
+    .map((record) => recordPeriod(record))
+    .filter(Boolean)
+    .sort((left, right) => periodSortKey(left).localeCompare(periodSortKey(right)));
+  if (!periods.length) return "";
+  return periods[0] === periods.at(-1) ? periods[0] : `${periods[0]} — ${periods.at(-1)}`;
+}
+
 function evidenceInventory(analysis = state.analysis) {
   const inventory = new Map();
   Object.entries(analysis?.materials || {}).forEach(([nodeId, material]) => {
@@ -1431,6 +1760,7 @@ function evidenceInventory(analysis = state.analysis) {
           endpoint,
           instrument,
           records,
+          contextRecords: Array.isArray(binding.context_records) ? binding.context_records : [],
           queryDate: binding.date || analysis?.date || "",
           nodeIds: new Set(),
           stateLabels: new Set()
@@ -1438,6 +1768,8 @@ function evidenceInventory(analysis = state.analysis) {
       }
       const item = inventory.get(key);
       if (records.length > item.records.length) item.records = records;
+      const contextRecords = Array.isArray(binding.context_records) ? binding.context_records : [];
+      if (contextRecords.length > item.contextRecords.length) item.contextRecords = contextRecords;
       item.nodeIds.add(nodeId);
       item.stateLabels.add(binding.state_label || stateLabel);
     });
@@ -1497,8 +1829,9 @@ function nodeSourceSummary(nodeId, analysis = state.analysis) {
   const items = evidenceInventory(analysis).filter((item) => item.nodeIds.includes(nodeId));
   const providers = [...new Set(items.map((item) => item.provider))];
   const records = items.reduce((sum, item) => sum + Math.max(1, item.records.length), 0);
+  const contextRecords = items.reduce((sum, item) => sum + (item.contextRecords?.length || 0), 0);
   if (!items.length) return evidenceProblem(analysis);
-  return `来自 ${providers.join(" + ")} · ${items.length} 个数据集 · ${records} 条时点记录`;
+  return `来自 ${providers.join(" + ")} · ${items.length} 个数据集 · ${records} 条核心记录 + ${contextRecords} 条低权重基线`;
 }
 
 function evidenceInspectorHtml(inventory, providerNames, providerDetail, analysis) {
@@ -1530,6 +1863,8 @@ function evidenceInspectorHtml(inventory, providerNames, providerDetail, analysi
   const binding = inventory[index];
   if (!binding) return `<section class="evidence-inspector"><div class="evidence-empty">${ui("点击数据源或数据集查看详细血缘", "Select a provider or dataset to inspect its lineage")}</div></section>`;
   const records = Array.isArray(binding.records) ? binding.records.slice(-6) : [];
+  const contextRecords = Array.isArray(binding.contextRecords) ? binding.contextRecords : [];
+  const baselineWeight = contextRecords.length ? Math.max(...contextRecords.map((item) => Number(item?.weight || 0))) : 0;
   const keys = [...new Set(records.flatMap((record) => Object.keys(record || {})))].filter((key) => !/^(id|create_|update_)/i.test(key)).slice(0, 6);
   const recordTable = records.length ? `
     <div class="evidence-record-table" role="table" aria-label="${ui("证据记录", "Evidence records")}">
@@ -1543,10 +1878,10 @@ function evidenceInspectorHtml(inventory, providerNames, providerDetail, analysi
         <code>${escapeHtml(binding.provider)}</code><i>→</i><code>${escapeHtml(binding.endpoint)}</code><i>→</i><code>${escapeHtml(binding.stateLabels.join(" + "))}</code>
       </div>
       <div class="evidence-inspector-metrics">
-        <div><span>${ui("记录", "Records")}</span><strong>${records.length}</strong></div>
+        <div><span>${ui("核心记录", "Primary records")}</span><strong>${records.length}</strong></div>
+        <div><span>${ui("基线记录", "Baseline records")}</span><strong>${contextRecords.length}${baselineWeight ? ` · w≤${baselineWeight.toFixed(2)}` : ""}</strong></div>
         <div><span>${ui("状态", "States")}</span><strong>${binding.stateLabels.length}</strong></div>
         <div><span>${ui("最新期", "Latest")}</span><strong>${escapeHtml(recordPeriod(latestEvidenceRecord(binding.records)) || "-")}</strong></div>
-        <div><span>${ui("缺口", "Gaps")}</span><strong>${missingNodeIds.length}</strong></div>
       </div>
       ${recordTable}
       <footer><strong>${ui("覆盖审计", "Coverage audit")}</strong><span>${missingNodeIds.length ? escapeHtml(missingNodeIds.join(", ")) : ui("所有执行状态均已绑定至少一条可用记录。", "Every executed state has at least one usable bound record.")}</span></footer>
@@ -1564,9 +1899,12 @@ function renderEvidenceConsole(analysis, event) {
     ...inventory.map((item) => item.provider)
   ])];
   const recordCount = inventory.reduce((sum, item) => sum + Math.max(1, item.records.length), 0);
+  const contextRecordCount = inventory.reduce((sum, item) => sum + (item.contextRecords?.length || 0), 0);
   const latestPeriods = inventory.map((item) => recordPeriod(latestEvidenceRecord(item.records))).filter(Boolean);
   const latestPeriod = latestPeriods.sort((left, right) => periodSortKey(left).localeCompare(periodSortKey(right))).at(-1) || analysis.date;
   const providerDetail = runtime.providers || {};
+  const rangeStart = analysis.constraints?.start_date || runtime.query_start_date || "";
+  const requestedRange = rangeStart ? `${rangeStart} — ${analysis.date}` : analysis.date;
 
   els.primaryKicker.textContent = "Evidence Operations";
   els.primaryTitle.textContent = ui("数据获取与证据血缘", "Data Retrieval and Evidence Lineage");
@@ -1574,10 +1912,10 @@ function renderEvidenceConsole(analysis, event) {
   els.downloadReport.hidden = true;
   els.reportProgress.textContent = `${activeIndex + 1} / ${order.length} ${ui("状态", "states")}`;
   els.reportMeta.innerHTML = [
-    `${ui("截止", "Cutoff")} ${analysis.date}`,
+    `${ui("要求范围", "Requested range")} ${requestedRange}`,
     `${providerNames.length} ${ui("个数据源", "providers")}`,
     `${inventory.length} ${ui("个数据集", "datasets")}`,
-    ui("Point-in-time 已校验", "Point-in-time verified")
+    ui("时间范围已校验", "Time range verified")
   ].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
 
   const providerRows = providerNames.map((provider, providerIndex) => {
@@ -1595,14 +1933,14 @@ function renderEvidenceConsole(analysis, event) {
   }).join("");
 
   const datasetRows = inventory.map((binding, bindingIndex) => {
-    const period = recordPeriod(latestEvidenceRecord(binding.records)) || binding.queryDate || "-";
+    const period = evidencePeriodRange(binding.records) || binding.queryDate || "-";
     const coverage = binding.stateLabels.slice(0, 2).join("、");
     const more = Math.max(0, binding.stateLabels.length - 2);
     return `
       <button type="button" class="dataset-row ${binding.nodeIds.includes(event.nodeId) ? "active" : ""} ${state.evidenceSelection.kind === "dataset" && Number(state.evidenceSelection.index) === bindingIndex ? "selected" : ""}" data-evidence-kind="dataset" data-evidence-index="${bindingIndex}" aria-pressed="${state.evidenceSelection.kind === "dataset" && Number(state.evidenceSelection.index) === bindingIndex}">
         <div class="dataset-source"><span>${escapeHtml(sourceInitial(binding.provider))}</span><strong>${escapeHtml(binding.instrument)}</strong></div>
         <div class="dataset-endpoint"><code>${escapeHtml(binding.endpoint)}</code><small>${escapeHtml(bindingSignals(binding))}</small></div>
-        <div class="dataset-period"><strong>${escapeHtml(period)}</strong><small>${Math.max(1, binding.records.length)} ${ui("条记录", "records")}</small></div>
+        <div class="dataset-period"><strong>${escapeHtml(period)}</strong><small>${Math.max(1, binding.records.length)} ${ui("条核心", "primary")} · ${binding.contextRecords?.length || 0} ${ui("条基线", "baseline")}</small></div>
         <div class="dataset-coverage"><strong>${escapeHtml(coverage || ui("当前状态", "Current state"))}${more ? ` +${more}` : ""}</strong><small>${ui("状态绑定", "State binding")}</small></div>
         <span class="dataset-status">${ui("查看详情", "Inspect")}</span>
       </button>`;
@@ -1613,12 +1951,12 @@ function renderEvidenceConsole(analysis, event) {
     <div class="evidence-console">
       <div class="evidence-commandbar">
         <div><span>LIVE DATA LINEAGE</span><strong>${escapeHtml(event.nodeId || "S")} · ${escapeHtml(analysis.template?.nodes?.find((node) => node.id === event.nodeId)?.label || "状态证据")}</strong></div>
-        <span class="lineage-cutoff">AS OF ${escapeHtml(analysis.date)}</span>
+        <span class="lineage-cutoff">RANGE ${escapeHtml(requestedRange)} · AS OF ${escapeHtml(analysis.date)}</span>
       </div>
       <div class="evidence-stats">
         <div><span>${ui("连接数据源", "Connected Providers")}</span><strong>${providerNames.length}</strong><small>${escapeHtml(providerNames.join(" + ") || ui("待配置", "Pending"))}</small></div>
         <div><span>${ui("已绑定数据集", "Bound Datasets")}</span><strong>${inventory.length}</strong><small>${ui("接口级去重", "Endpoint deduplicated")}</small></div>
-        <div><span>${ui("时点记录", "Point-in-time Records")}</span><strong>${recordCount}</strong><small>${ui("纳入证据缓存", "Cached for execution")}</small></div>
+        <div><span>${ui("核心 / 基线", "Primary / Baseline")}</span><strong>${recordCount} / ${contextRecordCount}</strong><small>${ui("权重 1.0 / 低权重衰减", "Weight 1.0 / decayed")}</small></div>
         <div><span>${ui("最新数据期", "Latest Period")}</span><strong>${escapeHtml(latestPeriod)}</strong><small>${ui("发布日校验通过", "Release date verified")}</small></div>
       </div>
       <section class="source-registry">
@@ -2094,6 +2432,9 @@ function renderReport() {
     analysis.domain,
     analysis.date,
     `${sections.length} 个写作状态`,
+    analysis.constraints?.report_length
+      ? `${analysis.constraints.report_length.label} · ${analysis.constraints.report_length.min}–${analysis.constraints.report_length.max} ${analysis.constraints.report_length.unit === "words" ? "words" : "字"}`
+      : "",
     evidenceSourceLabel(analysis),
     evidenceBindingStatusLabel(analysis)
   ].filter(Boolean).map((item) => `<span>${escapeHtml(item)}</span>`).join("");
@@ -2213,7 +2554,8 @@ async function refineReport() {
       date: state.analysis.date,
       sections: latestReportSections(),
       materials: state.analysis.materials || {},
-      language: state.language
+      language: state.language,
+      report_length: state.analysis.constraints?.report_length || "standard"
     });
     if (!Array.isArray(data.report_sections) || data.report_sections.length === 0) {
       throw new Error("模型未返回完整报告，请重新发送调整要求");
@@ -3775,6 +4117,9 @@ function bindEvents() {
   document.querySelectorAll("[data-threshold-preset]").forEach((button) => {
     button.addEventListener("click", () => applyThresholdPreset(button.dataset.thresholdPreset));
   });
+  document.querySelectorAll("[data-report-length]").forEach((button) => {
+    button.addEventListener("click", () => applyReportLengthPreset(button.dataset.reportLength));
+  });
   els.composerDfaSelect.addEventListener("change", () => {
     state.composerDfaId = els.composerDfaSelect.value || "system";
     const customDfa = selectedComposerDfa();
@@ -3880,6 +4225,13 @@ function bindEvents() {
     window.requestAnimationFrame(fitOfflineDfaToViewport);
   });
   els.uploadDfa.addEventListener("click", openUploadDfaBuilder);
+  els.apiSettings.addEventListener("click", openApiSettings);
+  els.composerApiSettings.addEventListener("click", openApiSettings);
+  els.generationActiveProvider.addEventListener("change", () => updateActiveProviderUi("generation"));
+  els.embeddingActiveProvider.addEventListener("change", () => updateActiveProviderUi("embedding"));
+  els.closeApiSettings.addEventListener("click", () => els.apiSettingsDialog.close());
+  els.cancelApiSettings.addEventListener("click", () => els.apiSettingsDialog.close());
+  els.apiSettingsForm.addEventListener("submit", submitApiSettings);
   els.closeUploadDfa.addEventListener("click", closeUploadDfaBuilder);
   els.uploadDfaTheta.addEventListener("input", () => {
     els.uploadDfaThetaValue.textContent = Number(els.uploadDfaTheta.value).toFixed(2);
@@ -4009,11 +4361,15 @@ function bindEvents() {
     if (event.key !== "Escape") return;
     if (state.graphExpanded) setGraphExpanded(false);
     if (els.thresholdPresetControl.open) els.thresholdPresetControl.open = false;
+    if (els.reportLengthControl.open) els.reportLengthControl.open = false;
     if (els.composerDfaSourceControl.open) els.composerDfaSourceControl.open = false;
   });
   document.addEventListener("click", (event) => {
     if (els.thresholdPresetControl.open && !els.thresholdPresetControl.contains(event.target)) {
       els.thresholdPresetControl.open = false;
+    }
+    if (els.reportLengthControl.open && !els.reportLengthControl.contains(event.target)) {
+      els.reportLengthControl.open = false;
     }
     if (els.composerDfaSourceControl.open && !els.composerDfaSourceControl.contains(event.target)) {
       els.composerDfaSourceControl.open = false;
@@ -4036,6 +4392,7 @@ function bindEvents() {
 
 initializeTimeRangeChoices();
 updateThresholdPresetUi();
+applyReportLengthPreset("standard");
 renderComposerDfaOptions();
 if (IS_GITHUB_PAGES) {
   document.querySelector(".workspace")?.classList.add("pages-demo-mode");
